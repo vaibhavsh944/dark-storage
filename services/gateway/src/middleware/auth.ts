@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { DomainError } from '@dark-storage/shared';
+import { DomainError, ROLE_PERMISSIONS, Role } from '@dark-storage/shared';
 import { config } from '../config.js';
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -15,12 +15,32 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       sub: string | number;
       role: string;
       name: string;
+      permissions?: string[];
+      zones?: string | string[];
+      shift?: string;
     };
 
+    const role = decoded.role as Role;
+    const permissions = decoded.permissions ?? (role && ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : []);
+
+    let parsedZones: string[] = [];
+    if (Array.isArray(decoded.zones)) {
+      parsedZones = decoded.zones;
+    } else if (typeof decoded.zones === 'string') {
+      try {
+        parsedZones = JSON.parse(decoded.zones);
+      } catch {
+        parsedZones = [];
+      }
+    }
+
     req.user = {
-      id: Number(decoded.sub),
-      role: decoded.role,
-      name: decoded.name
+      id: decoded.sub,
+      role,
+      name: decoded.name,
+      permissions,
+      zones: parsedZones,
+      shift: decoded.shift || 'MORNING'
     };
     next();
   } catch (err) {

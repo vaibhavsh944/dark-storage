@@ -8,14 +8,14 @@
 - [x] P0-T5 Baseline smoke test & DB backup
 
 ## Phase 1: Foundations (MUST)
-- [ ] P1-T1 Test harness
-- [ ] P1-T2 Migration 010_roles_users.sql
-- [ ] P1-T3 Seed users for 4 roles
-- [ ] P1-T4 Migration 011_system_config.sql
-- [ ] P1-T5 Shared library (packages/shared)
-- [ ] P1-T6 DB transaction, config & sequence helpers
-- [ ] P1-T7 Auth & permission middleware
-- [ ] P1-T8 Unit tests
+- [x] P1-T1 Test harness
+- [x] P1-T2 Migration 010_roles_users.sql
+- [x] P1-T3 Seed users for 4 roles
+- [x] P1-T4 Migration 011_system_config.sql
+- [x] P1-T5 Shared library (packages/shared)
+- [x] P1-T6 DB transaction, config & sequence helpers
+- [x] P1-T7 Auth & permission middleware
+- [x] P1-T8 Unit tests
 
 ## Phase 2: RBAC enforcement and removal of Manager execution powers (MUST)
 - [ ] P2-T1 Guard all Gateway/Engine3 routes
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P1-T1
+next: P2-T1

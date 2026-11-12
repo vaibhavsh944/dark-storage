@@ -60,3 +60,10 @@ export type SelectionMode = (typeof SELECTION_MODES)[number];
 
 export const NAV_NODE_KINDS = ['DOCK', 'PACK', 'CROSS', 'AISLE'] as const;
 export type NavNodeKind = (typeof NAV_NODE_KINDS)[number];
+
+export const REASON_CODES = [
+  'DAMAGED', 'EXPIRED', 'MISSING', 'FOUND', 'COUNT_VARIANCE',
+  'THEFT_SUSPECTED', 'MISPLACED', 'SUPPLIER_SHORT', 'CUSTOMER_CANCEL',
+  'STUCK_PICKER', 'OUT_OF_STOCK', 'BIN_FULL', 'BIN_BLOCKED', 'OTHER'
+] as const;
+export type ReasonCode = (typeof REASON_CODES)[number];

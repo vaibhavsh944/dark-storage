@@ -9,24 +9,50 @@ export function seedBase(db: Database.Database): void {
 
   const defaultPassword = process.env.SEED_DEFAULT_PASSWORD || 'Warehouse#2026';
   const passwordHash = bcrypt.hashSync(defaultPassword, 10);
+  const pinHash = bcrypt.hashSync('1111', 10);
 
   const tx = db.transaction(() => {
     // 1. Users
     const users = [
-      { username: 'manager1', display_name: 'Manager', role: 'MANAGER' },
-      { username: 'operator1', display_name: 'Operator', role: 'OPERATOR' },
-      { username: 'picker1', display_name: 'Picker', role: 'PICKER' },
-      { username: 'picker2', display_name: 'Picker 2', role: 'PICKER' },
-      { username: 'staff1', display_name: 'Staff', role: 'STAFF' }
+      { username: 'manager1', display_name: 'Manager 1', role: 'MANAGER', badge_id: 'BDG-MGR-01', zones: '[]', shift: 'MORNING' },
+      { username: 'manager2', display_name: 'Manager 2', role: 'MANAGER', badge_id: 'BDG-MGR-02', zones: '[]', shift: 'EVENING' },
+      { username: 'operator1', display_name: 'Operator 1', role: 'OPERATOR', badge_id: 'BDG-OPR-01', zones: '[]', shift: 'MORNING' },
+      { username: 'operator2', display_name: 'Operator 2', role: 'OPERATOR', badge_id: 'BDG-OPR-02', zones: '[]', shift: 'EVENING' },
+      { username: 'picker1', display_name: 'Picker 1', role: 'PICKER', badge_id: 'BDG-PCK-01', zones: '["A","B"]', shift: 'MORNING' },
+      { username: 'picker2', display_name: 'Picker 2', role: 'PICKER', badge_id: 'BDG-PCK-02', zones: '["A","B","C"]', shift: 'EVENING' },
+      { username: 'picker3', display_name: 'Picker 3', role: 'PICKER', badge_id: 'BDG-PCK-03', zones: '[]', shift: 'NIGHT' },
+      { username: 'staff1', display_name: 'Staff 1', role: 'STAFF', badge_id: 'BDG-STF-01', zones: '[]', shift: 'MORNING' },
+      { username: 'staff2', display_name: 'Staff 2', role: 'STAFF', badge_id: 'BDG-STF-02', zones: '[]', shift: 'EVENING' }
     ];
 
-    const insertUser = db.prepare(`
-      INSERT INTO users (username, display_name, password_hash, role, active)
-      VALUES (?, ?, ?, ?, 1)
-      ON CONFLICT(username) DO NOTHING
-    `);
-    for (const u of users) {
-      insertUser.run(u.username, u.display_name, passwordHash, u.role);
+    const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
+    const hasBadgeCol = cols.includes('badge_id');
+
+    if (hasBadgeCol) {
+      const insertOrUpdateUser = db.prepare(`
+        INSERT INTO users (username, display_name, password_hash, role, active, badge_id, pin_hash, zones, shift)
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)
+        ON CONFLICT(username) DO UPDATE SET
+          display_name = excluded.display_name,
+          password_hash = excluded.password_hash,
+          role = excluded.role,
+          badge_id = excluded.badge_id,
+          pin_hash = excluded.pin_hash,
+          zones = excluded.zones,
+          shift = excluded.shift
+      `);
+      for (const u of users) {
+        insertOrUpdateUser.run(u.username, u.display_name, passwordHash, u.role, u.badge_id, pinHash, u.zones, u.shift);
+      }
+    } else {
+      const insertUser = db.prepare(`
+        INSERT INTO users (username, display_name, password_hash, role, active)
+        VALUES (?, ?, ?, ?, 1)
+        ON CONFLICT(username) DO NOTHING
+      `);
+      for (const u of users) {
+        insertUser.run(u.username, u.display_name, passwordHash, u.role);
+      }
     }
 
     // 2. Products

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import { loginRequestSchema } from '@dark-storage/shared';
+import { loginRequestSchema, ROLE_PERMISSIONS, Role } from '@dark-storage/shared';
 import { config } from '../config.js';
 import { callEngine3 } from '../clients/engine3.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -15,7 +15,10 @@ authRouter.post('/api/auth/login', async (req, res, next) => {
       id: number;
       username: string;
       display_name: string;
-      role: string;
+      role: Role;
+      zones?: string[];
+      shift?: string;
+      permissions?: string[];
     }>({
       method: 'POST',
       path: '/internal/v1/auth/verify',
@@ -23,14 +26,22 @@ authRouter.post('/api/auth/login', async (req, res, next) => {
       requestId: req.requestId
     });
 
+    const role = user.role as Role;
+    const permissions = user.permissions ?? (role && ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : []);
+    const zones = user.zones ?? [];
+    const shift = user.shift ?? 'MORNING';
+
     const token = jwt.sign(
       {
         sub: user.id,
         role: user.role,
-        name: user.display_name
+        name: user.display_name,
+        permissions,
+        zones,
+        shift
       },
       config.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: '12h' }
     );
 
     res.json({
@@ -39,8 +50,11 @@ authRouter.post('/api/auth/login', async (req, res, next) => {
         id: user.id,
         username: user.username,
         display_name: user.display_name,
-        role: user.role
-      }
+        role: user.role,
+        zones,
+        shift
+      },
+      permissions
     });
   } catch (err) {
     next(err);
@@ -48,9 +62,21 @@ authRouter.post('/api/auth/login', async (req, res, next) => {
 });
 
 authRouter.get('/api/auth/me', authMiddleware, (req, res) => {
+  const role = req.user!.role as Role;
+  const permissions = req.user!.permissions ?? (role && ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : []);
+
   res.json({
     id: req.user!.id,
     display_name: req.user!.name,
-    role: req.user!.role
+    role: req.user!.role,
+    user: {
+      id: req.user!.id,
+      username: req.user!.name,
+      display_name: req.user!.name,
+      role: req.user!.role,
+      zones: req.user!.zones ?? [],
+      shift: req.user!.shift ?? 'MORNING'
+    },
+    permissions
   });
 });

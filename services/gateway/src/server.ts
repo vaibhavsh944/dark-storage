@@ -23,6 +23,7 @@ import { exceptionsRouter } from './routes/exceptions.js';
 import { packingRouter } from './routes/packing.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { usersRouter } from './routes/users.js';
+import { configRouter } from './routes/config.js';
 
 export function createApp(): Express {
   const app = express();
@@ -59,6 +60,7 @@ export function createApp(): Express {
   app.use('/api/packing', packingRouter);
   app.use('/api', dashboardRouter);
   app.use('/api/users', usersRouter);
+  app.use('/api/config', configRouter);
 
 
   // Unknown route handler

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
-import { DomainError, loginRequestSchema } from '@dark-storage/shared';
+import { DomainError, loginRequestSchema, ROLE_PERMISSIONS, Role } from '@dark-storage/shared';
 
 export function createAuthRouter(db: Database.Database): Router {
   const router = Router();
@@ -10,18 +10,17 @@ export function createAuthRouter(db: Database.Database): Router {
     try {
       const { username, password } = loginRequestSchema.parse(req.body);
 
+      const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map(c => c.name);
+      const hasZones = cols.includes('zones');
+      const hasShift = cols.includes('shift');
+
       const user = db.prepare(`
         SELECT id, username, display_name, password_hash, role, active
+               ${hasZones ? ', zones' : ''}
+               ${hasShift ? ', shift' : ''}
         FROM users
         WHERE username = ? COLLATE NOCASE
-      `).get(username) as {
-        id: number;
-        username: string;
-        display_name: string;
-        password_hash: string;
-        role: string;
-        active: number;
-      } | undefined;
+      `).get(username) as any;
 
       if (!user || user.active !== 1) {
         throw new DomainError('UNAUTHENTICATED', 'Invalid username or password');
@@ -32,11 +31,26 @@ export function createAuthRouter(db: Database.Database): Router {
         throw new DomainError('UNAUTHENTICATED', 'Invalid username or password');
       }
 
+      let parsedZones: string[] = [];
+      if (user.zones) {
+        try {
+          parsedZones = typeof user.zones === 'string' ? JSON.parse(user.zones) : user.zones;
+        } catch {
+          parsedZones = [];
+        }
+      }
+
+      const role = user.role as Role;
+      const permissions = ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : [];
+
       res.json({
         id: user.id,
         username: user.username,
         display_name: user.display_name,
-        role: user.role
+        role: user.role,
+        zones: parsedZones,
+        shift: user.shift || 'MORNING',
+        permissions
       });
     } catch (err) {
       next(err);

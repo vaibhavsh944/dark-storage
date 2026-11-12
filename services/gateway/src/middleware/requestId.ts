@@ -1,14 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'node:crypto';
+import type { Role } from '@dark-storage/shared';
 
 declare global {
   namespace Express {
     interface Request {
       requestId: string;
       user?: {
-        id: number;
-        role: string;
+        id: number | string;
+        role: Role;
         name: string;
+        permissions?: readonly string[];
+        zones?: string[] | null;
+        shift?: string | null;
       } | null;
     }
   }

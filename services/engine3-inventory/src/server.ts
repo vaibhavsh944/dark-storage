@@ -23,6 +23,7 @@ import { createPickingRouter } from './routes/picking.js';
 import { createPackingRouter } from './routes/packing.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createOutboxRouter } from './routes/outbox.js';
+import { createConfigRouter } from './routes/config.js';
 
 export function createApp(db: Database.Database): Express {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp(db: Database.Database): Express {
   app.use(createPackingRouter(db));
   app.use(createDashboardRouter(db));
   app.use(createOutboxRouter(db));
+  app.use(createConfigRouter(db));
 
   // Error handler
   app.use(errorHandler);

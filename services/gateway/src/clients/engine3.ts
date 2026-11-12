@@ -6,7 +6,7 @@ export interface Engine3RequestOptions {
   path: string;
   body?: unknown;
   requestId?: string;
-  actor?: { id: number; role: string } | null;
+  actor?: { id: number | string; role: string; [key: string]: any } | null;
   idempotencyKey?: string;
   timeoutMs?: number;
 }

@@ -6,8 +6,9 @@ export interface RunViaEngine1Options {
   priority: number;
   key: string;
   actor: {
-    id: number;
-    display_name: string;
+    id: number | string;
+    display_name?: string;
+    name?: string;
     role: string;
   };
   payload: Record<string, unknown>;
@@ -24,7 +25,7 @@ export async function postTaskToEngine1(opts: {
   type: string;
   priority: number;
   idempotency_key: string;
-  actor: { id: number; display_name: string; role: string };
+  actor: { id: number | string; display_name?: string; name?: string; role: string };
   payload: Record<string, unknown>;
   resources: string[];
 }): Promise<TaskDto | { id: string; status: string }> {
