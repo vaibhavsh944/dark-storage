@@ -1,15 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { DomainError } from '@dark-storage/shared';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { callEngine3 } from '../clients/engine3.js';
 
 export const missionsRouter = Router();
 
 missionsRouter.use(authMiddleware);
 
-// POST /api/missions/:ref/start (PICKER - own mission)
-missionsRouter.post('/:ref/start', rbacMiddleware(['PICKER', 'MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/missions/:ref/start (pick:execute - PICKER only)
+missionsRouter.post('/:ref/start', requirePerm('pick:execute'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
     if (!key) {
@@ -36,8 +36,8 @@ missionsRouter.post('/:ref/start', rbacMiddleware(['PICKER', 'MANAGER']), async 
   }
 });
 
-// GET /api/missions?status=&picker_id=&page=
-missionsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/missions?status=&picker_id=&page= (order:view or pick:execute)
+missionsRouter.get('/', requirePerm(['order:view', 'pick:execute']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const queryParams = new URLSearchParams(req.query as Record<string, string>);
 
@@ -58,8 +58,8 @@ missionsRouter.get('/', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// GET /api/missions/:ref
-missionsRouter.get('/:ref', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/missions/:ref (order:view or pick:execute)
+missionsRouter.get('/:ref', requirePerm(['order:view', 'pick:execute']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3<any>({
       method: 'GET',

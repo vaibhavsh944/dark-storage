@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { config } from '../config.js';
 import { callEngine3 } from '../clients/engine3.js';
 
@@ -40,8 +40,8 @@ dashboardRouter.get('/dashboard', authMiddleware, async (req: Request, res: Resp
   }
 });
 
-// GET /api/audit (MANAGER only)
-dashboardRouter.get('/audit', authMiddleware, rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/audit (audit:view)
+dashboardRouter.get('/audit', authMiddleware, requirePerm('audit:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const queryParams = new URLSearchParams(req.query as Record<string, string>);
     const result = await callEngine3({
@@ -56,8 +56,8 @@ dashboardRouter.get('/audit', authMiddleware, rbacMiddleware(['MANAGER']), async
   }
 });
 
-// GET /api/admin/integrity (MANAGER only)
-dashboardRouter.get('/admin/integrity', authMiddleware, rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/admin/integrity (audit:view)
+dashboardRouter.get('/admin/integrity', authMiddleware, requirePerm('audit:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3({
       method: 'GET',

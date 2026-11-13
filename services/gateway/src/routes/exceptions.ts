@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { DomainError, resolveExceptionSchema, exceptionQuerySchema } from '@dark-storage/shared';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { runViaEngine1 } from '../clients/engine1.js';
 import { callEngine2 } from '../clients/engine2.js';
 import { callEngine3 } from '../clients/engine3.js';
@@ -10,8 +10,8 @@ export const exceptionsRouter = Router();
 
 exceptionsRouter.use(authMiddleware);
 
-// GET /api/exceptions?status=&mission=&page= (PICKER sees own)
-exceptionsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/exceptions?status=&mission=&page= (exception:view)
+exceptionsRouter.get('/', requirePerm('exception:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const queryParams = new URLSearchParams(req.query as Record<string, string>);
 
@@ -31,8 +31,8 @@ exceptionsRouter.get('/', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// GET /api/exceptions/:ref
-exceptionsRouter.get('/:ref', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/exceptions/:ref (exception:view)
+exceptionsRouter.get('/:ref', requirePerm('exception:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3<any>({
       method: 'GET',
@@ -55,10 +55,10 @@ exceptionsRouter.get('/:ref', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-// POST /api/exceptions/:ref/resolve (MANAGER) - ORCH + E1
+// POST /api/exceptions/:ref/resolve (exception:resolve) - ORCH + E1
 exceptionsRouter.post(
   '/:ref/resolve',
-  rbacMiddleware(['MANAGER']),
+  requirePerm('exception:resolve'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);

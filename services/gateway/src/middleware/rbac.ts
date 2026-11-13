@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { can, Role, Role as SharedRole, ROLE_PERMISSIONS } from '@dark-storage/shared';
+import { can, type Role, ROLE_PERMISSIONS } from '@dark-storage/shared';
 
-export function requirePerm(perm: string): (req: Request, res: Response, next: NextFunction) => void {
+export function requirePerm(perm: string | readonly string[]): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({
@@ -13,11 +13,14 @@ export function requirePerm(perm: string): (req: Request, res: Response, next: N
     }
 
     const userWithPerms = {
-      role: req.user.role as SharedRole,
-      permissions: req.user.permissions ?? (req.user.role ? (ROLE_PERMISSIONS[req.user.role as SharedRole] as readonly string[]) : [])
+      role: req.user.role as Role,
+      permissions: req.user.permissions ?? (req.user.role ? (ROLE_PERMISSIONS[req.user.role as Role] as readonly string[]) : [])
     };
 
-    if (!can(userWithPerms, perm)) {
+    const perms = Array.isArray(perm) ? perm : [perm];
+    const allowed = perms.some((p) => can(userWithPerms, p));
+
+    if (!allowed) {
       res.status(403).json({
         error: 'Forbidden',
         code: 'FORBIDDEN',

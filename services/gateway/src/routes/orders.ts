@@ -1,17 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { DomainError, createOrderSchema, cancelOrderSchema, assignMissionSchema, reassignMissionSchema, packOrderSchema } from '@dark-storage/shared';
+import { DomainError, createOrderSchema, cancelOrderSchema, reassignMissionSchema } from '@dark-storage/shared';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { runViaEngine1 } from '../clients/engine1.js';
-import { callEngine2 } from '../clients/engine2.js';
 import { callEngine3 } from '../clients/engine3.js';
 
 export const ordersRouter = Router();
 
 ordersRouter.use(authMiddleware);
 
-// POST /api/orders (MANAGER) - E1
-ordersRouter.post('/', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/orders (order:create) - E1
+ordersRouter.post('/', requirePerm('order:create'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
     if (!key) {
@@ -51,8 +50,8 @@ ordersRouter.post('/', rbacMiddleware(['MANAGER']), async (req: Request, res: Re
   }
 });
 
-// POST /api/orders/:ref/cancel (MANAGER) - PROXY
-ordersRouter.post('/:ref/cancel', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/orders/:ref/cancel (order:cancel) - PROXY
+ordersRouter.post('/:ref/cancel', requirePerm('order:cancel'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
     if (!key) {
@@ -76,81 +75,17 @@ ordersRouter.post('/:ref/cancel', rbacMiddleware(['MANAGER']), async (req: Reque
   }
 });
 
-async function executeAssign(ref: string, pickerId: number, idempotencyKey: string, requestId: string, actor: any) {
-  // 1. Get pick-plan from Engine 3
-  const planRes = await callEngine3<any>({
-    method: 'GET',
-    path: `/internal/v1/orders/${ref}/pick-plan`,
-    requestId
+// POST /api/orders/:ref/assign - 410 ENDPOINT_REMOVED (D11 shortcut)
+ordersRouter.post('/:ref/assign', (req: Request, res: Response) => {
+  res.status(410).json({
+    error: 'Endpoint removed for Segregation of Duties',
+    code: 'ENDPOINT_REMOVED',
+    details: { replacement: '/api/missions/claim-next' }
   });
-  const pickPlan = planRes.data;
-
-  // 2. Call Engine 2 to plan route
-  const planStops = pickPlan.reservations.map((r: any) => ({
-    key: r.reservation_id,
-    bin_code: r.bin_code,
-    node: r.node,
-    shelf_code: r.shelf_code,
-    level: r.level
-  }));
-
-  const routeRes = await callEngine2<any>({
-    method: 'POST',
-    path: '/internal/v1/routes/plan',
-    body: {
-      start: 'DOCK',
-      end: 'PACK',
-      stops: planStops
-    },
-    requestId
-  });
-  const route = routeRes.data;
-
-  // 3. Call Engine 3 to assign mission
-  return await callEngine3<any>({
-    method: 'POST',
-    path: `/internal/v1/orders/${ref}/assign`,
-    body: {
-      picker_id: pickerId,
-      plan_token: pickPlan.plan_token,
-      route
-    },
-    requestId,
-    actor,
-    idempotencyKey
-  });
-}
-
-// POST /api/orders/:ref/assign (MANAGER) - ORCH
-ordersRouter.post('/:ref/assign', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
-    if (!key) {
-      throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key header is required');
-    }
-
-    const parsed = assignMissionSchema.parse(req.body);
-    const actor = { id: req.user!.id, role: req.user!.role, display_name: req.user!.name };
-
-    try {
-      const result = await executeAssign(req.params.ref, parsed.picker_id, key, req.requestId, actor);
-      res.status(result.status).json(result.data);
-    } catch (err) {
-      if (err instanceof DomainError && err.code === 'PLAN_STALE') {
-        // Auto-retry once
-        const retryResult = await executeAssign(req.params.ref, parsed.picker_id, key, req.requestId, actor);
-        res.status(retryResult.status).json(retryResult.data);
-        return;
-      }
-      throw err;
-    }
-  } catch (err) {
-    next(err);
-  }
 });
 
-// POST /api/orders/:ref/reassign (MANAGER)
-ordersRouter.post('/:ref/reassign', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/orders/:ref/reassign (mission:reassign)
+ordersRouter.post('/:ref/reassign', requirePerm('mission:reassign'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
     if (!key) {
@@ -175,8 +110,8 @@ ordersRouter.post('/:ref/reassign', rbacMiddleware(['MANAGER']), async (req: Req
   }
 });
 
-// GET /api/orders?status=&priority=&search=&page=
-ordersRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/orders (order:view)
+ordersRouter.get('/', requirePerm('order:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = new URLSearchParams(req.query as Record<string, string>).toString();
     const result = await callEngine3({
@@ -191,8 +126,8 @@ ordersRouter.get('/', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-// GET /api/orders/:ref
-ordersRouter.get('/:ref', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/orders/:ref (order:view)
+ordersRouter.get('/:ref', requirePerm('order:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3({
       method: 'GET',
@@ -206,36 +141,11 @@ ordersRouter.get('/:ref', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// POST /api/orders/:ref/pack (STAFF, MANAGER) - PROXY
-ordersRouter.post(
-  '/:ref/pack',
-  rbacMiddleware(['STAFF', 'MANAGER']),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const key = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
-      if (!key) {
-        throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key header is required');
-      }
-
-      const parsed = packOrderSchema.parse(req.body);
-      const actor = {
-        id: req.user!.id,
-        role: req.user!.role,
-        display_name: req.user!.name
-      };
-
-      const result = await callEngine3({
-        method: 'POST',
-        path: `/internal/v1/orders/${req.params.ref}/pack`,
-        body: parsed,
-        requestId: req.requestId,
-        actor,
-        idempotencyKey: key
-      });
-
-      res.status(result.status).json(result.data);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
+// POST /api/orders/:ref/pack - 410 ENDPOINT_REMOVED (D11 shortcut)
+ordersRouter.post('/:ref/pack', (req: Request, res: Response) => {
+  res.status(410).json({
+    error: 'Endpoint removed for Segregation of Duties',
+    code: 'ENDPOINT_REMOVED',
+    details: { replacement: '/api/packing/open' }
+  });
+});

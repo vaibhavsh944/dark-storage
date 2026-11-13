@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { ProductLabel } from '../components/ProductLabel.js';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { LabelPrintModal } from '../components/LabelPrintModal.js';
@@ -54,12 +55,6 @@ export const InventoryPage: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedOccupied, setSelectedOccupied] = useState('');
   const [selectedBinCode, setSelectedBinCode] = useState<string | null>(null);
-
-  // Recount modal state
-  const [recountModalOpen, setRecountModalOpen] = useState(false);
-  const [recountQty, setRecountQty] = useState<number>(0);
-  const [recountSku, setRecountSku] = useState('');
-  const [recountReason, setRecountReason] = useState('Routine cycle count');
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Relocate modal state
@@ -74,9 +69,8 @@ export const InventoryPage: React.FC = () => {
   const [printValue, setPrintValue] = useState('');
   const [printTab, setPrintTab] = useState<'sku' | 'bin' | 'receipt'>('sku');
 
-  const user = useAuthStore((s) => s.user);
-  const isManager = user?.role === 'MANAGER';
-  const canRelocate = user?.role === 'MANAGER' || user?.role === 'OPERATOR';
+  const canResolveException = useCan('exception:resolve');
+  const canRelocate = useCan('relocate:execute');
   const queryClient = useQueryClient();
 
 
@@ -143,25 +137,6 @@ export const InventoryPage: React.FC = () => {
     },
     onError: (err: any) => {
       setActionError(err.message || 'Failed to update status');
-    }
-  });
-
-  const recountMutation = useMutation({
-    mutationFn: async ({ code, counted_qty, sku, reason }: { code: string; counted_qty: number; sku?: string; reason: string }) => {
-      return apiFetch(`/api/inventory/bins/${encodeURIComponent(code)}/recount`, {
-        method: 'POST',
-        headers: { 'idempotency-key': `recount-${code}-${Date.now()}` },
-        body: JSON.stringify({ counted_qty, sku: sku || undefined, reason })
-      });
-    },
-    onSuccess: () => {
-      setActionError(null);
-      setRecountModalOpen(false);
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      refetchBinDetail();
-    },
-    onError: (err: any) => {
-      setActionError(err.message || 'Failed to apply recount');
     }
   });
 
@@ -515,7 +490,7 @@ export const InventoryPage: React.FC = () => {
             )}
 
             {/* Manager Actions */}
-            {isManager && (
+            {canResolveException && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                 {binDetail.status === 'ACTIVE' ? (
                   <>
@@ -542,18 +517,6 @@ export const InventoryPage: React.FC = () => {
                     Reactivate Bin
                   </button>
                 )}
-
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setRecountQty(binDetail.qty);
-                    setRecountSku(binDetail.sku || '');
-                    setRecountModalOpen(true);
-                  }}
-                  data-testid="bin-recount-btn"
-                >
-                  Recount
-                </button>
               </div>
             )}
 
@@ -603,74 +566,6 @@ export const InventoryPage: React.FC = () => {
                   ))}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recount Modal */}
-      {recountModalOpen && selectedBinCode && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
-            <h3>Recount Bin: {selectedBinCode}</h3>
-            {actionError && (
-              <div style={{ color: 'var(--accent-danger)', marginBottom: 12 }}>{actionError}</div>
-            )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-              <div>
-                <label>Counted Quantity:</label>
-                <input
-                  type="number"
-                  min="0"
-                  className="input"
-                  value={recountQty}
-                  onChange={(e) => setRecountQty(parseInt(e.target.value, 10) || 0)}
-                  data-testid="recount-qty-input"
-                />
-              </div>
-
-              {recountQty > 0 && !binDetail?.sku && (
-                <div>
-                  <label>Product SKU (required for empty bin):</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={recountSku}
-                    onChange={(e) => setRecountSku(e.target.value)}
-                    placeholder="e.g. SKU001"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label>Reason:</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={recountReason}
-                  onChange={(e) => setRecountReason(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-                <button className="btn btn-secondary" onClick={() => setRecountModalOpen(false)}>
-                  Cancel
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => {
-                    recountMutation.mutate({
-                      code: selectedBinCode,
-                      counted_qty: recountQty,
-                      sku: recountSku || undefined,
-                      reason: recountReason
-                    });
-                  }}
-                  data-testid="bin-recount-submit"
-                >
-                  Submit Recount
-                </button>
-              </div>
             </div>
           </div>
         </div>

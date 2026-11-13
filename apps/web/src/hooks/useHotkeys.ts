@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 export interface UseHotkeysOptions {
   userRole?: string;
+  canPick?: boolean;
   onNavigate: (path: string) => void;
   onShowToast: (message: string) => void;
   onToggleHelp: () => void;
@@ -74,11 +75,11 @@ export function handleHotkeyDown(e: KeyboardEvent, options: UseHotkeysOptions): 
     return true;
   }
 
-  // 6. Alt + P -> /picking (Role-aware: MANAGER and PICKER only)
+  // 6. Alt + P -> /picking (Permission-aware: canPick only)
   if (e.code === 'KeyP') {
     e.preventDefault();
-    const isPickingRole = options.userRole === 'MANAGER' || options.userRole === 'PICKER';
-    if (isPickingRole) {
+    const canPick = options.canPick ?? (options.userRole ? ['MANAGER', 'PICKER'].includes(options.userRole) : false);
+    if (canPick) {
       options.onNavigate('/picking');
     } else {
       options.onShowToast("Picking isn't available for your role");

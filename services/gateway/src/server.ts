@@ -46,12 +46,13 @@ export function createApp(): Express {
 
   app.use(healthRouter);
   app.use(authRouter);
-  app.use(productsRouter);
+  app.use('/api/products', productsRouter);
   app.use('/api/inventory', inventoryRouter);
   app.use('/api/warehouse', warehouseRouter);
   app.use('/api/receipts', receiptsRouter);
   app.use('/api/placement', placementRouter);
   app.use('/api/putaways', putawaysRouter);
+  app.use('/api/putaway', putawaysRouter);
   app.use('/api/tasks', tasksRouter);
   app.use('/api/orders', ordersRouter);
   app.use('/api/missions', missionsRouter);

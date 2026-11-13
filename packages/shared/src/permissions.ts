@@ -1,5 +1,5 @@
-import { ROLES, Role } from './enums.js';
-export { ROLES, Role };
+import { ROLES, type Role } from './enums.js';
+export { ROLES, type Role };
 
 export const ROLE_PERMISSIONS: Record<Role, readonly string[]> = {
   MANAGER: [

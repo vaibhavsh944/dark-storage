@@ -21,9 +21,12 @@ export type UserDto = z.infer<typeof userDtoSchema>;
 export interface AuthResponse {
   token: string;
   user: {
-    id: number;
+    id: number | string;
     username: string;
     display_name: string;
     role: (typeof ROLES)[number];
+    zones?: string[];
+    shift?: string;
   };
+  permissions?: string[];
 }

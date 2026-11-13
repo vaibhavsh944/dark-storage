@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { MissionDto } from '@dark-storage/shared';
 import { StatusBadge } from '../components/StatusBadge.js';
 
@@ -13,8 +14,8 @@ export const PickingPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
 
-  const isPicker = user?.role === 'PICKER';
-  const isManager = user?.role === 'MANAGER';
+  const canPick = useCan('pick:execute');
+  const canControl = useCan('control:view');
 
   const { data, isLoading } = useQuery<{ missions: MissionDto[]; total: number; page: number; page_size: number }>({
     queryKey: ['missions', statusFilter, page],
@@ -37,16 +38,16 @@ export const PickingPage: React.FC = () => {
       <div className="m3-page-header">
         <div>
           <h1>
-            {isPicker ? 'My Picking Missions' : 'Picking Missions'}
+            {canPick ? 'My Picking Missions' : 'Picking Missions'}
           </h1>
           <p className="m3-subtitle">
-            {isPicker
+            {canPick
               ? 'View assigned picking missions and execute optimized pick routes'
               : 'Monitor warehouse picking routes, assignments, and mission progress'}
           </p>
         </div>
 
-        {isManager && (
+        {canControl && (
           <div style={{ width: '200px' }}>
             <select
               className="select"
@@ -73,7 +74,7 @@ export const PickingPage: React.FC = () => {
       ) : missions.length === 0 ? (
         <div className="card" style={{ padding: '3.5rem', textAlign: 'center' }}>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '15px' }}>
-            {isPicker ? 'No active picking missions assigned to you.' : 'No missions found.'}
+            {canPick ? 'No active picking missions assigned to you.' : 'No missions found.'}
           </p>
         </div>
       ) : (
@@ -83,7 +84,7 @@ export const PickingPage: React.FC = () => {
               <tr>
                 <th>Mission Ref</th>
                 <th>Order Ref</th>
-                {!isPicker && <th>Picker</th>}
+                {!canPick && <th>Picker</th>}
                 <th>Algorithm</th>
                 <th>Distance</th>
                 <th>Stops</th>
@@ -98,7 +99,7 @@ export const PickingPage: React.FC = () => {
                     <span style={{ fontWeight: 700, color: 'var(--accent-primary)', fontFamily: 'var(--font-mono)' }}>{m.ref}</span>
                   </td>
                   <td><span style={{ fontFamily: 'var(--font-mono)' }}>{m.order_ref}</span></td>
-                  {!isPicker && <td style={{ fontWeight: 600 }}>{m.picker.name}</td>}
+                  {!canPick && <td style={{ fontWeight: 600 }}>{m.picker.name}</td>}
                   <td>
                     <span className="badge badge-info">{m.route.algorithm}</span>
                   </td>

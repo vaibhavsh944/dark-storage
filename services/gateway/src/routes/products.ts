@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { callEngine3 } from '../clients/engine3.js';
 
 export const productsRouter = Router();
 
-productsRouter.get('/api/products', authMiddleware, async (req, res, next) => {
+productsRouter.use(authMiddleware, requirePerm('inventory:view'));
+
+productsRouter.get('/', async (req, res, next) => {
   try {
     const qs = new URLSearchParams(req.query as Record<string, string>).toString();
     const path = `/internal/v1/products${qs ? `?${qs}` : ''}`;
@@ -22,7 +25,7 @@ productsRouter.get('/api/products', authMiddleware, async (req, res, next) => {
   }
 });
 
-productsRouter.get('/api/products/:sku', authMiddleware, async (req, res, next) => {
+productsRouter.get('/:sku', async (req, res, next) => {
   try {
     const { data } = await callEngine3({
       method: 'GET',

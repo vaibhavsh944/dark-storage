@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { OrderDto } from '@dark-storage/shared';
 import { StatusBadge } from '../components/StatusBadge.js';
 
@@ -15,7 +16,7 @@ export const OrdersPage: React.FC = () => {
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
 
-  const isManager = user?.role === 'MANAGER';
+  const canCreate = useCan('order:create');
 
   const { data, isLoading } = useQuery<{ items?: OrderDto[]; orders?: OrderDto[]; page: number; page_size: number; total: number }>({
     queryKey: ['orders', page, search, status, priority],
@@ -44,7 +45,7 @@ export const OrdersPage: React.FC = () => {
             Manage customer, transfer, and production orders with atomic stock reservations
           </p>
         </div>
-        {isManager && (
+        {canCreate && (
           <button
             className="btn btn-primary"
             onClick={() => navigate('/orders/new')}

@@ -1,15 +1,16 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { DomainError } from '@dark-storage/shared';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
+import { config } from '../config.js';
 import { getTaskFromEngine1, listTasksFromEngine1, getLocksFromEngine1, getQueueFromEngine1 } from '../clients/engine1.js';
 
 export const tasksRouter = Router();
 
 tasksRouter.use(authMiddleware);
 
-// GET /api/tasks/locks (MANAGER)
-tasksRouter.get('/locks', rbacMiddleware(['MANAGER']), async (_req: Request, res: Response, next: NextFunction) => {
+// GET /api/tasks/locks (control:view)
+tasksRouter.get('/locks', requirePerm('control:view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await getLocksFromEngine1();
     res.json(data);
@@ -18,8 +19,27 @@ tasksRouter.get('/locks', rbacMiddleware(['MANAGER']), async (_req: Request, res
   }
 });
 
-// GET /api/tasks/queue (MANAGER)
-tasksRouter.get('/queue', rbacMiddleware(['MANAGER']), async (_req: Request, res: Response, next: NextFunction) => {
+// POST /api/tasks/locks/release (lock:release)
+tasksRouter.post('/locks/release', requirePerm('lock:release'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const e1Res = await fetch(`${config.ENGINE1_URL}/internal/v1/locks/release`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-token': config.INTERNAL_TOKEN,
+        Authorization: `Bearer ${config.INTERNAL_TOKEN}`
+      },
+      body: JSON.stringify(req.body)
+    });
+    const data = await e1Res.json();
+    res.status(e1Res.status).json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/tasks/queue (control:view)
+tasksRouter.get('/queue', requirePerm('control:view'), async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await getQueueFromEngine1();
     res.json(data);
@@ -28,8 +48,8 @@ tasksRouter.get('/queue', rbacMiddleware(['MANAGER']), async (_req: Request, res
   }
 });
 
-// GET /api/tasks (MANAGER)
-tasksRouter.get('/', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/tasks (control:view)
+tasksRouter.get('/', requirePerm('control:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await listTasksFromEngine1({
       status: req.query.status as string | undefined,
@@ -43,7 +63,7 @@ tasksRouter.get('/', rbacMiddleware(['MANAGER']), async (req: Request, res: Resp
   }
 });
 
-// GET /api/tasks/:id (Task's actor or MANAGER)
+// GET /api/tasks/:id (Task's actor or MANAGER - control:view or authenticated)
 tasksRouter.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const taskId = req.params.id;

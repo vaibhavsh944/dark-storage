@@ -5,6 +5,7 @@ import { ProductLabel } from '../components/ProductLabel.js';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { AllocationModal } from '../components/AllocationModal.js';
 import { LabelPrintModal } from '../components/LabelPrintModal.js';
+import { useCan } from '../hooks/useCan.js';
 
 interface ProductItem {
   sku: string;
@@ -99,7 +100,9 @@ interface ReceiptDetail {
 }
 
 export const ReceivingPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'new' | 'staged' | 'receipts' | 'putaways'>('new');
+  const canReceive = useCan('inbound:receive');
+  const canPutaway = useCan('putaway:execute');
+  const [activeTab, setActiveTab] = useState<'new' | 'staged' | 'receipts' | 'putaways'>(canReceive ? 'new' : 'staged');
   const queryClient = useQueryClient();
 
 
@@ -276,16 +279,18 @@ export const ReceivingPage: React.FC = () => {
 
       {/* Tabs */}
       <div className="tabs" role="tablist" aria-label="Receiving sections">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'new'}
-          className={`tab-btn ${activeTab === 'new' ? 'active' : ''}`}
-          onClick={() => setActiveTab('new')}
-          data-testid="tab-new-intake"
-        >
-          New Intake
-        </button>
+        {canReceive && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'new'}
+            className={`tab-btn ${activeTab === 'new' ? 'active' : ''}`}
+            onClick={() => setActiveTab('new')}
+            data-testid="tab-new-intake"
+          >
+            New Intake
+          </button>
+        )}
         <button
           type="button"
           role="tab"
@@ -626,14 +631,18 @@ export const ReceivingPage: React.FC = () => {
                     <td><strong>{row.qty_staged}</strong></td>
                     <td>{new Date(row.received_at).toLocaleString()}</td>
                     <td>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '2px 8px', fontSize: 12 }}
-                        onClick={() => setSelectedLineForAlloc(row)}
-                        data-testid={`staged-allocate-${row.line_id}`}
-                      >
-                        Allocate
-                      </button>
+                      {canPutaway ? (
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '2px 8px', fontSize: 12 }}
+                          onClick={() => setSelectedLineForAlloc(row)}
+                          data-testid={`staged-allocate-${row.line_id}`}
+                        >
+                          Allocate
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Read-only</span>
+                      )}
                     </td>
                   </tr>
                 ))

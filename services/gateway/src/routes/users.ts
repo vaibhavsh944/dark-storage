@@ -1,14 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 import { callEngine3 } from '../clients/engine3.js';
 
 export const usersRouter = Router();
 
 usersRouter.use(authMiddleware);
 
-// GET /api/users?role=PICKER (MANAGER)
-usersRouter.get('/', rbacMiddleware(['MANAGER']), async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/users?role=PICKER (user:manage)
+usersRouter.get('/', requirePerm('user:manage'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const role = req.query.role as string;
     if (role === 'PICKER') {

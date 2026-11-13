@@ -1,12 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { callEngine3 } from '../clients/engine3.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requirePerm } from '../middleware/rbac.js';
 
 export const warehouseRouter = Router();
 
-warehouseRouter.use(authMiddleware);
+warehouseRouter.use(authMiddleware, requirePerm('inventory:view'));
 
-// GET /api/warehouse/layout
+// GET /api/warehouse/layout (inventory:view)
 warehouseRouter.get('/layout', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3({

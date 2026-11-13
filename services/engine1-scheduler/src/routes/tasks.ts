@@ -237,3 +237,14 @@ tasksRouter.get('/internal/v1/stats', (_req: Request, res: Response) => {
     failed_tasks_24h: failedRow.c
   });
 });
+
+tasksRouter.post('/internal/v1/locks/release', (req: Request, res: Response) => {
+  const resource = req.body?.resource;
+  if (!resource) {
+    res.status(400).json({ error: 'resource required' });
+    return;
+  }
+  const db = getSchedulerDb();
+  db.prepare('DELETE FROM locks WHERE resource = ?').run(resource);
+  res.json({ success: true, released: resource });
+});

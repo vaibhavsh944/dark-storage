@@ -2,14 +2,14 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { DomainError } from '@dark-storage/shared';
 import { callEngine3 } from '../clients/engine3.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 
 export const receiptsRouter = Router();
 
 receiptsRouter.use(authMiddleware);
 
-// POST /api/receipts (MANAGER, OPERATOR) - PROXY, Idempotency-Key required
-receiptsRouter.post('/', rbacMiddleware(['MANAGER', 'OPERATOR']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/receipts (inbound:receive - OPERATOR only) - PROXY, Idempotency-Key required
+receiptsRouter.post('/', requirePerm('inbound:receive'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const idemKey = (req.headers['idempotency-key'] as string) || (req.headers['x-idempotency-key'] as string);
     if (!idemKey) {
@@ -33,8 +33,8 @@ receiptsRouter.post('/', rbacMiddleware(['MANAGER', 'OPERATOR']), async (req: Re
   }
 });
 
-// GET /api/receipts/staged
-receiptsRouter.get('/staged', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/receipts/staged (inbound:receive or po:view)
+receiptsRouter.get('/staged', requirePerm(['inbound:receive', 'po:view']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await callEngine3({
       method: 'GET',
@@ -48,8 +48,8 @@ receiptsRouter.get('/staged', async (req: Request, res: Response, next: NextFunc
   }
 });
 
-// GET /api/receipts
-receiptsRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/receipts (inbound:receive or po:view)
+receiptsRouter.get('/', requirePerm(['inbound:receive', 'po:view']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const query = new URLSearchParams(req.query as Record<string, string>).toString();
     const result = await callEngine3({
@@ -64,8 +64,8 @@ receiptsRouter.get('/', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-// GET /api/receipts/:ref
-receiptsRouter.get('/:ref', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/receipts/:ref (inbound:receive or po:view)
+receiptsRouter.get('/:ref', requirePerm(['inbound:receive', 'po:view']), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const ref = req.params.ref;
     const result = await callEngine3({

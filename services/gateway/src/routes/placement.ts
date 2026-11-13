@@ -7,14 +7,14 @@ import {
 import { callEngine3 } from '../clients/engine3.js';
 import { callEngine2 } from '../clients/engine2.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { rbacMiddleware } from '../middleware/rbac.js';
+import { requirePerm } from '../middleware/rbac.js';
 
 export const placementRouter = Router();
 
 placementRouter.use(authMiddleware);
 
-// POST /api/placement/recommend (MANAGER, OPERATOR)
-placementRouter.post('/recommend', rbacMiddleware(['MANAGER', 'OPERATOR']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/placement/recommend (putaway:execute - OPERATOR only)
+placementRouter.post('/recommend', requirePerm('putaway:execute'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = RecommendPlacementSchema.parse(req.body);
 
@@ -66,8 +66,49 @@ placementRouter.post('/recommend', rbacMiddleware(['MANAGER', 'OPERATOR']), asyn
   }
 });
 
-// POST /api/placement/validate (MANAGER, OPERATOR)
-placementRouter.post('/validate', rbacMiddleware(['MANAGER', 'OPERATOR']), async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/placement/validate (putaway:execute - OPERATOR only)
+placementRouter.post('/validate', requirePerm('putaway:execute'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = ValidatePlacementSchema.parse(req.body);
+    let effectiveSku = parsed.sku;
+
+    if (parsed.receipt_line_id !== undefined) {
+      const lineRes = await callEngine3<any>({
+        method: 'GET',
+        path: `/internal/v1/receipts/lines/${parsed.receipt_line_id}`,
+        requestId: req.requestId
+      });
+      const line = lineRes.data;
+      if (parsed.qty > line.qty_staged) {
+        throw new DomainError('QUANTITY_INVALID', `Quantity exceeds staged quantity of ${line.qty_staged}`);
+      }
+      effectiveSku = line.sku;
+    }
+
+    if (!effectiveSku) {
+      throw new DomainError('VALIDATION_ERROR', 'SKU or valid receipt_line_id required');
+    }
+
+    const e2Res = await callEngine2<any>({
+      method: 'POST',
+      path: '/internal/v1/placement/validate',
+      body: {
+        bin: parsed.dest_bin,
+        sku: effectiveSku,
+        qty: parsed.qty,
+        allow_partial: true
+      },
+      requestId: req.requestId
+    });
+
+    res.json(e2Res.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/placement/evaluate (putaway:execute - alias to validate)
+placementRouter.post('/evaluate', requirePerm('putaway:execute'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = ValidatePlacementSchema.parse(req.body);
     let effectiveSku = parsed.sku;

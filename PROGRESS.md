@@ -18,12 +18,12 @@
 - [x] P1-T8 Unit tests
 
 ## Phase 2: RBAC enforcement and removal of Manager execution powers (MUST)
-- [ ] P2-T1 Guard all Gateway/Engine3 routes
-- [ ] P2-T2 Remove Manager execution powers and return 410 ENDPOINT_REMOVED on D11 shortcuts
-- [ ] P2-T3 Frontend permissions & route guards
-- [ ] P2-T4 Strip forbidden execution buttons from Manager UI
-- [ ] P2-T5 Secure Demo Role Switcher (D17)
-- [ ] P2-T6 Integration test tests/integration/rbac.test.ts
+- [x] P2-T1 Guard all Gateway/Engine3 routes
+- [x] P2-T2 Remove Manager execution powers and return 410 ENDPOINT_REMOVED on D11 shortcuts
+- [x] P2-T3 Frontend permissions & route guards
+- [x] P2-T4 Strip forbidden execution buttons from Manager UI
+- [x] P2-T5 Secure Demo Role Switcher (D17)
+- [x] P2-T6 Integration test tests/integration/rbac.test.ts
 
 ## Phase 3: Hash-chained audit log and order events (MUST)
 - [ ] P3-T1 Migration 012_audit_chain.sql
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P2-T1
+next: P3-T1

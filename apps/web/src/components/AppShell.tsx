@@ -5,6 +5,8 @@ import { useAuthStore } from '../stores/authStore.js';
 import { useRealtime } from '../hooks/useRealtime.js';
 import { useRealtimeStore } from '../stores/realtimeStore.js';
 import { useHotkeys } from '../hooks/useHotkeys.js';
+import { useCan } from '../hooks/useCan.js';
+import { getRoleWorkspace } from './RequirePerm.js';
 import { apiFetch } from '../api/client.js';
 import { AuthResponse } from '@dark-storage/shared';
 
@@ -26,6 +28,16 @@ export const AppShell: React.FC<AppShellProps> = ({ navLinks }) => {
   useRealtime();
   const { connected, statusText } = useRealtimeStore();
   const [switchingRole, setSwitchingRole] = useState(false);
+
+  // Permissions for sidebar links
+  const canControl = useCan('control:view');
+  const canReceive = useCan('inbound:receive');
+  const canInventory = useCan('inventory:view');
+  const canOrders = useCan('order:view');
+  const canPick = useCan('pick:execute');
+  const canPack = useCan('pack:execute');
+  const canException = useCan('exception:view');
+  const canAudit = useCan('audit:view');
 
   // Keyboard shortcut help modal & toast states
   const [helpOpen, setHelpOpen] = useState(false);
@@ -54,6 +66,7 @@ export const AppShell: React.FC<AppShellProps> = ({ navLinks }) => {
   // Bind global keyboard shortcuts
   useHotkeys({
     userRole: user?.role,
+    canPick,
     onNavigate: handleNavigate,
     onShowToast: showToast,
     onToggleHelp: handleToggleHelp
@@ -69,13 +82,19 @@ export const AppShell: React.FC<AppShellProps> = ({ navLinks }) => {
     if (!account || account.username === user?.username || switchingRole) return;
     setSwitchingRole(true);
     try {
-      const resp = await apiFetch<AuthResponse>('/api/auth/login', {
+      const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
+      const endpoint = isDemo ? '/api/auth/dev-switch' : '/api/auth/login';
+      const body = isDemo
+        ? JSON.stringify({ username: account.username })
+        : JSON.stringify({ username: account.username, password: '' });
+
+      const resp = await apiFetch<AuthResponse>(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ username: account.username, password: 'Warehouse#2026' })
+        body
       });
-      login(resp.token, resp.user);
+      login(resp.token, resp.user, resp.permissions);
       queryClient.clear();
-      navigate('/');
+      navigate(getRoleWorkspace(resp.user.role));
     } catch (err) {
       console.error('Role switch failed:', err);
     } finally {
@@ -83,22 +102,17 @@ export const AppShell: React.FC<AppShellProps> = ({ navLinks }) => {
     }
   };
 
-  const isReceivingRole = user?.role === 'MANAGER' || user?.role === 'OPERATOR';
-  const isPickingRole = user?.role === 'MANAGER' || user?.role === 'PICKER';
-  const isPackingRole = user?.role === 'MANAGER' || user?.role === 'STAFF';
-  const isManager = user?.role === 'MANAGER';
-
   const defaultLinks = [
-    { to: '/', label: 'Home', testId: 'nav-home', hotkey: 'Alt+H' },
-    ...(isReceivingRole ? [{ to: '/receiving', label: 'Receiving', testId: 'nav-receiving' }] : []),
-    { to: '/inventory', label: 'Inventory', testId: 'nav-inventory', hotkey: 'Alt+I' },
-    { to: '/orders', label: 'Orders', testId: 'nav-orders', hotkey: 'Alt+O' },
-    ...(isPickingRole ? [{ to: '/picking', label: 'Picking', testId: 'nav-picking', hotkey: 'Alt+P' }] : []),
-    ...(isPackingRole ? [{ to: '/packing', label: 'Packing', testId: 'nav-packing' }] : []),
-    ...(isPickingRole ? [{ to: '/exceptions', label: 'Exceptions', testId: 'nav-exceptions' }] : []),
-    { to: '/warehouse', label: 'Warehouse', testId: 'nav-warehouse', hotkey: 'Alt+W' },
-    ...(isManager ? [{ to: '/tasks', label: 'Tasks', testId: 'nav-tasks' }] : []),
-    ...(isManager ? [{ to: '/admin', label: 'Admin', testId: 'nav-admin' }] : [])
+    ...(canControl ? [{ to: '/', label: 'Home', testId: 'nav-home', hotkey: 'Alt+H' }] : []),
+    ...(canReceive ? [{ to: '/receiving', label: 'Receiving', testId: 'nav-receiving' }] : []),
+    ...(canInventory ? [{ to: '/inventory', label: 'Inventory', testId: 'nav-inventory', hotkey: 'Alt+I' }] : []),
+    ...(canOrders ? [{ to: '/orders', label: 'Orders', testId: 'nav-orders', hotkey: 'Alt+O' }] : []),
+    ...(canPick ? [{ to: '/picking', label: 'Picking', testId: 'nav-picking', hotkey: 'Alt+P' }] : []),
+    ...(canPack ? [{ to: '/packing', label: 'Packing', testId: 'nav-packing' }] : []),
+    ...(canException ? [{ to: '/exceptions', label: 'Exceptions', testId: 'nav-exceptions' }] : []),
+    ...(canInventory ? [{ to: '/warehouse', label: 'Warehouse', testId: 'nav-warehouse', hotkey: 'Alt+W' }] : []),
+    ...(canControl ? [{ to: '/tasks', label: 'Tasks', testId: 'nav-tasks' }] : []),
+    ...(canAudit ? [{ to: '/admin', label: 'Admin', testId: 'nav-admin' }] : [])
   ];
 
   const links = navLinks || defaultLinks;
@@ -118,36 +132,38 @@ export const AppShell: React.FC<AppShellProps> = ({ navLinks }) => {
             {connected ? 'Live' : statusText || 'Reconnecting…'}
           </span>
 
-          {/* Quick Top Bar Role Switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
-              Role:
-            </span>
-            <select
-              className="select"
-              value={user?.role || 'MANAGER'}
-              onChange={(e) => handleRoleSwitch(e.target.value)}
-              disabled={switchingRole}
-              style={{
-                padding: '4px 10px',
-                fontSize: '12px',
-                height: '32px',
-                borderRadius: 'var(--radius-pill)',
-                backgroundColor: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-color)',
-                cursor: 'pointer',
-                fontWeight: 600
-              }}
-              title="Switch role instantly"
-              data-testid="header-role-switcher"
-            >
-              <option value="MANAGER">👔 Manager</option>
-              <option value="OPERATOR">⚙️ Operator</option>
-              <option value="PICKER">📦 Picker</option>
-              <option value="STAFF">📋 Staff</option>
-            </select>
-          </div>
+          {/* Quick Top Bar Role Switcher - Demo Mode Only */}
+          {import.meta.env.VITE_DEMO_MODE === 'true' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>
+                Role:
+              </span>
+              <select
+                className="select"
+                value={user?.role || 'MANAGER'}
+                onChange={(e) => handleRoleSwitch(e.target.value)}
+                disabled={switchingRole}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  height: '32px',
+                  borderRadius: 'var(--radius-pill)',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+                title="Switch role instantly"
+                data-testid="header-role-switcher"
+              >
+                <option value="MANAGER">👔 Manager</option>
+                <option value="OPERATOR">⚙️ Operator</option>
+                <option value="PICKER">📦 Picker</option>
+                <option value="STAFF">📋 Staff</option>
+              </select>
+            </div>
+          )}
 
           {/* Keyboard Shortcuts Trigger Button */}
           <button

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { StressLabView } from '../features/stresslab/StressLabView.js';
 import { LabelPrintModal } from '../components/LabelPrintModal.js';
 
@@ -50,6 +51,8 @@ export const AdminPage: React.FC = () => {
     action?: string;
   }>({});
 
+  const canAuditView = useCan('audit:view');
+
   const {
     data: auditData,
     isLoading: auditLoading,
@@ -71,7 +74,7 @@ export const AdminPage: React.FC = () => {
       params.set('limit', '25');
       return apiFetch(`/api/audit?${params.toString()}`);
     },
-    enabled: activeTab === 'audit' && user?.role === 'MANAGER'
+    enabled: activeTab === 'audit' && canAuditView
   });
 
   const {
@@ -83,7 +86,7 @@ export const AdminPage: React.FC = () => {
   } = useQuery<IntegrityResponse>({
     queryKey: ['admin-integrity'],
     queryFn: () => apiFetch('/api/admin/integrity'),
-    enabled: activeTab === 'integrity' && user?.role === 'MANAGER'
+    enabled: activeTab === 'integrity' && canAuditView
   });
 
   const handleApplyFilters = (e: React.FormEvent) => {

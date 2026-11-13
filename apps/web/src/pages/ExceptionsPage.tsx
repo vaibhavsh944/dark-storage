@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { PickExceptionDto } from '@dark-storage/shared';
 import { StatusBadge } from '../components/StatusBadge.js';
 import { Link } from 'react-router-dom';
@@ -9,7 +10,7 @@ import { Link } from 'react-router-dom';
 export const ExceptionsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const isManager = user?.role === 'MANAGER';
+  const canResolve = useCan('exception:resolve');
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OPEN' | 'RESOLVED'>('OPEN');
   const [missionFilter, setMissionFilter] = useState('');
@@ -160,7 +161,7 @@ export const ExceptionsPage: React.FC = () => {
               <th>Expected / Actual</th>
               <th>Reported By</th>
               <th>Resolution</th>
-              {isManager && <th>Action</th>}
+              {canResolve && <th>Action</th>}
             </tr>
           </thead>
           <tbody>
@@ -239,7 +240,7 @@ export const ExceptionsPage: React.FC = () => {
                       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>—</span>
                     )}
                   </td>
-                  {isManager && (
+                  {canResolve && (
                     <td>
                       {exc.status === 'OPEN' ? (
                         <button

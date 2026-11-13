@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch, ApiError } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
 import { AuthResponse } from '@dark-storage/shared';
+import { getRoleWorkspace } from '../components/RequirePerm.js';
 
 export const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -27,8 +28,8 @@ export const LoginPage: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ username, password })
       });
-      login(resp.token, resp.user);
-      navigate('/');
+      login(resp.token, resp.user, resp.permissions);
+      navigate(getRoleWorkspace(resp.user.role));
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'UNAUTHENTICATED') {
@@ -44,19 +45,21 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleQuickLogin = async (user: string, pass: string) => {
+  const handleQuickLogin = async (user: string) => {
     setUsername(user);
-    setPassword(pass);
     setLoading(true);
     setError(null);
 
     try {
-      const resp = await apiFetch<AuthResponse>('/api/auth/login', {
+      const isDemo = import.meta.env.VITE_DEMO_MODE === 'true';
+      const endpoint = isDemo ? '/api/auth/dev-switch' : '/api/auth/login';
+      const body = isDemo ? JSON.stringify({ username: user }) : JSON.stringify({ username: user, password: '' });
+      const resp = await apiFetch<AuthResponse>(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ username: user, password: pass })
+        body
       });
-      login(resp.token, resp.user);
-      navigate('/');
+      login(resp.token, resp.user, resp.permissions);
+      navigate(getRoleWorkspace(resp.user.role));
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === 'UNAUTHENTICATED') {
@@ -93,7 +96,7 @@ export const LoginPage: React.FC = () => {
               type="button"
               className="btn btn-secondary"
               style={{ padding: '9px 12px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              onClick={() => handleQuickLogin('manager1', 'Warehouse#2026')}
+              onClick={() => handleQuickLogin('manager1')}
               disabled={loading}
               data-testid="role-login-manager"
             >
@@ -103,7 +106,7 @@ export const LoginPage: React.FC = () => {
               type="button"
               className="btn btn-secondary"
               style={{ padding: '9px 12px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              onClick={() => handleQuickLogin('operator1', 'Warehouse#2026')}
+              onClick={() => handleQuickLogin('operator1')}
               disabled={loading}
               data-testid="role-login-operator"
             >
@@ -113,7 +116,7 @@ export const LoginPage: React.FC = () => {
               type="button"
               className="btn btn-secondary"
               style={{ padding: '9px 12px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              onClick={() => handleQuickLogin('picker1', 'Warehouse#2026')}
+              onClick={() => handleQuickLogin('picker1')}
               disabled={loading}
               data-testid="role-login-picker"
             >
@@ -123,7 +126,7 @@ export const LoginPage: React.FC = () => {
               type="button"
               className="btn btn-secondary"
               style={{ padding: '9px 12px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-              onClick={() => handleQuickLogin('staff1', 'Warehouse#2026')}
+              onClick={() => handleQuickLogin('staff1')}
               disabled={loading}
               data-testid="role-login-staff"
             >

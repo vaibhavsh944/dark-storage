@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
+import { useCan } from '../hooks/useCan.js';
 import { PackingQueueItemDto, PackingResultDto } from '@dark-storage/shared';
 import { StatusBadge } from '../components/StatusBadge.js';
 
 export const PackingPage: React.FC = () => {
-  const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const isManager = user?.role === 'MANAGER';
-  const isStaff = user?.role === 'STAFF';
-  const canPack = isManager || isStaff;
+  const canPack = useCan('pack:execute');
+  const canDispatchView = useCan('dispatch:view');
 
   const [selectedOrderRef, setSelectedOrderRef] = useState<string | null>(null);
-  const [packNotes, setPackNotes] = useState('');
-  const [acceptPartial, setAcceptPartial] = useState(false);
-  const [packError, setPackError] = useState('');
-  const [packSuccess, setPackSuccess] = useState<PackingResultDto | null>(null);
-  const [packKey, setPackKey] = useState<string>('');
 
   const { data, isLoading } = useQuery<{ items: PackingQueueItemDto[] }>({
     queryKey: ['packing-queue'],
@@ -28,52 +22,11 @@ export const PackingPage: React.FC = () => {
   const queue = data?.items || [];
   const selectedOrder = queue.find((o) => o.order_ref === selectedOrderRef) || queue[0] || null;
 
-  // On selecting an order, reset form
   const handleSelectOrder = (order: PackingQueueItemDto) => {
     setSelectedOrderRef(order.order_ref);
-    setPackNotes('');
-    setAcceptPartial(false);
-    setPackError('');
-    setPackSuccess(null);
-    setPackKey(`pack-${order.order_ref}-${Date.now()}`);
-  };
-
-  const packMutation = useMutation({
-    mutationFn: (body: any) =>
-      apiFetch<PackingResultDto>(`/api/orders/${selectedOrder!.order_ref}/pack`, {
-        method: 'POST',
-        headers: {
-          'Idempotency-Key': packKey || `pack-${selectedOrder!.order_ref}-${Date.now()}`
-        },
-        body: JSON.stringify(body)
-      }),
-    onSuccess: (res: PackingResultDto) => {
-      setPackSuccess(res);
-      setPackError('');
-      setSelectedOrderRef(null);
-      queryClient.invalidateQueries({ queryKey: ['packing-queue'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['order'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    },
-    onError: (err: any) => {
-      setPackError(err.message || 'Failed to pack order');
-    }
-  });
-
-  const handleConfirmPack = () => {
-    if (!selectedOrder) return;
-    packMutation.mutate({
-      notes: packNotes.trim() || undefined,
-      accept_partial: acceptPartial
-    });
   };
 
   const isPartial = selectedOrder?.fulfilment_preview === 'PARTIAL';
-  const canConfirm =
-    canPack &&
-    (!isPartial || (isManager && acceptPartial)) &&
-    !packMutation.isPending;
 
   return (
     <div className="m3-page">
@@ -85,12 +38,6 @@ export const PackingPage: React.FC = () => {
           </p>
         </div>
       </div>
-
-      {packSuccess && (
-        <div className="banner banner-success" data-testid="pack-success-banner">
-          ✓ {packSuccess.packing_ref} — Order <strong>{packSuccess.order_ref}</strong> completed ({packSuccess.fulfilment_type} fulfilment).
-        </div>
-      )}
 
       {/* Main Grid: Left Queue, Right Detail */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '24px', alignItems: 'start' }}>
@@ -177,12 +124,6 @@ export const PackingPage: React.FC = () => {
               </div>
             </div>
 
-            {packError && (
-              <div className="banner banner-error" data-testid="pack-error-banner">
-                {packError}
-              </div>
-            )}
-
             {/* Lines Table */}
             <div>
               <h4 style={{ margin: '0 0 10px', fontSize: '1rem', fontWeight: 700 }}>Order Lines Verification</h4>
@@ -253,67 +194,10 @@ export const PackingPage: React.FC = () => {
               </div>
             )}
 
-            {/* Notes Input */}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">
-                Packing Notes (Optional)
-              </label>
-              <textarea
-                className="input-field"
-                rows={2}
-                data-testid="pack-notes-input"
-                placeholder="e.g. Packed in standard cardboard box with bubble wrap..."
-                value={packNotes}
-                onChange={(e) => setPackNotes(e.target.value)}
-              />
-            </div>
-
-            {/* Manager acceptance for partial */}
-            {isPartial && (
-              <div
-                className="alert alert-warning"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-              >
-                <div style={{ fontWeight: 700, color: '#fde68a', fontSize: '14px' }}>
-                  Partial Fulfilment Warning ({selectedOrder.total_short} units short)
-                </div>
-                {isManager ? (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13.5px' }}>
-                    <input
-                      type="checkbox"
-                      data-testid="pack-accept-partial-checkbox"
-                      checked={acceptPartial}
-                      onChange={(e) => setAcceptPartial(e.target.checked)}
-                    />
-                    <span>I accept partial fulfilment for this order</span>
-                  </label>
-                ) : (
-                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }} data-testid="staff-pack-disabled">
-                    Manager approval is required to pack orders with shortfalls.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Confirm packing button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                data-testid="pack-confirm-btn"
-                onClick={handleConfirmPack}
-                disabled={!canConfirm}
-              >
-                {packMutation.isPending
-                  ? 'Confirming Packing...'
-                  : isPartial
-                  ? 'Confirm Partial Packing'
-                  : 'Confirm Packing'}
-              </button>
+            <div style={{ marginTop: 16, padding: '12px 16px', backgroundColor: 'var(--bg-surface)', borderRadius: 6, border: '1px solid var(--border-color)' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                {canPack ? 'Active packing execution is conducted at the packing bench (/floor/pack).' : 'Read-only packing queue inspection. Physical packing is restricted to Staff.'}
+              </span>
             </div>
           </div>
         ) : (
