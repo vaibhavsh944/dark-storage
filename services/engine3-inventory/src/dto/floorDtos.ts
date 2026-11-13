@@ -109,42 +109,81 @@ export function toPackSessionDTO(db: Database.Database | null, sessionRow: any):
       flaggedQty: Number(l.flaggedQty ?? l.flagged_qty ?? 0)
     }));
   } else if (db && sessionRow.id) {
-    const dbLines = db.prepare(`
-      SELECT
-        l.sku,
-        p.barcode,
-        p.name AS product_name,
-        l.expected_qty,
-        l.scanned_qty,
-        l.flagged_qty
-      FROM pack_session_lines l
-      LEFT JOIN products p ON p.sku = l.sku
-      WHERE l.session_id = ?
-    `).all(sessionRow.id) as any[];
+    const orderRow = db.prepare('SELECT id FROM orders WHERE ref = ?').get(sessionRow.order_ref) as { id: number } | undefined;
+    if (orderRow) {
+      const rawLines = db.prepare(`
+        SELECT
+          ol.sku,
+          p.barcode,
+          p.name AS product_name,
+          p.weight_g,
+          CASE WHEN ol.qty_picked > 0 THEN ol.qty_picked ELSE ol.qty_ordered END AS expected_qty
+        FROM order_lines ol
+        LEFT JOIN products p ON p.sku = ol.sku COLLATE NOCASE
+        WHERE ol.order_id = ?
+        ORDER BY ol.line_no ASC
+      `).all(orderRow.id) as Array<{
+        sku: string;
+        barcode: string | null;
+        product_name: string | null;
+        weight_g: number | null;
+        expected_qty: number;
+      }>;
 
-    lines = dbLines.map(l => ({
-      sku: l.sku,
-      barcode: l.barcode || l.sku,
-      productName: l.product_name || l.sku,
-      expectedQty: Number(l.expected_qty),
-      scannedQty: Number(l.scanned_qty),
-      flaggedQty: Number(l.flagged_qty)
-    }));
+      const scanAgg = db.prepare(`
+        SELECT
+          sku,
+          SUM(CASE WHEN kind = 'SCANNED' THEN qty ELSE 0 END) AS scanned_qty,
+          SUM(CASE WHEN kind IN ('MISSING', 'DAMAGED') THEN qty ELSE 0 END) AS flagged_qty
+        FROM pack_scans
+        WHERE session_id = ?
+        GROUP BY sku
+      `).all(sessionRow.id) as Array<{
+        sku: string;
+        scanned_qty: number;
+        flagged_qty: number;
+      }>;
+
+      const scanMap = new Map<string, { scanned: number; flagged: number }>();
+      for (const s of scanAgg) {
+        scanMap.set(s.sku.toUpperCase(), { scanned: Number(s.scanned_qty || 0), flagged: Number(s.flagged_qty || 0) });
+      }
+
+      lines = rawLines.map(rl => {
+        const counts = scanMap.get(rl.sku.toUpperCase()) || { scanned: 0, flagged: 0 };
+        return {
+          sku: rl.sku,
+          barcode: rl.barcode || rl.sku,
+          productName: rl.product_name || rl.sku,
+          expectedQty: Number(rl.expected_qty),
+          scannedQty: counts.scanned,
+          flaggedQty: counts.flagged
+        };
+      });
+    }
   }
+
+  const allLinesDone = lines.length > 0 && lines.every(l => l.scannedQty + l.flaggedQty === l.expectedQty);
+  const weightOk = Boolean(sessionRow.weight_ok ?? sessionRow.weightOk ?? false);
+  const canComplete = Boolean(
+    sessionRow.can_complete ?? sessionRow.canComplete ?? (allLinesDone && weightOk)
+  );
 
   return {
     sessionId: sessionRow.id,
     orderRef: sessionRow.order_ref,
     toteCode: sessionRow.tote_code,
-    benchCode: sessionRow.bench_code,
+    benchCode: sessionRow.bench_code || sessionRow.benchCode || 'BENCH-1',
     status: sessionRow.status,
     lines,
     expectedWeightG: Number(sessionRow.expected_weight_g ?? sessionRow.expectedWeightG ?? 0),
-    actualWeightG: sessionRow.actual_weight_g !== null && sessionRow.actual_weight_g !== undefined
-      ? Number(sessionRow.actual_weight_g)
-      : (sessionRow.actualWeightG !== null && sessionRow.actualWeightG !== undefined ? Number(sessionRow.actualWeightG) : null),
-    weightOk: Boolean(sessionRow.weight_ok ?? sessionRow.weightOk ?? false),
-    canComplete: Boolean(sessionRow.can_complete ?? sessionRow.canComplete ?? false)
+    actualWeightG: sessionRow.weight_g !== null && sessionRow.weight_g !== undefined
+      ? Number(sessionRow.weight_g)
+      : (sessionRow.actual_weight_g !== null && sessionRow.actual_weight_g !== undefined
+          ? Number(sessionRow.actual_weight_g)
+          : (sessionRow.actualWeightG !== null && sessionRow.actualWeightG !== undefined ? Number(sessionRow.actualWeightG) : null)),
+    weightOk,
+    canComplete
   };
 }
 

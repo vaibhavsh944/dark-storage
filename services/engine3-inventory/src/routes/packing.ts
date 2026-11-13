@@ -1,8 +1,14 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import Database from 'better-sqlite3';
-import { DomainError, packOrderSchema } from '@dark-storage/shared';
-import { runIdempotent } from '../domain/idempotency.js';
-import { getPackingQueue, executePackOrder } from '../domain/packingRepo.js';
+import { getPackingQueue } from '../domain/packingRepo.js';
+import {
+  openPackSession,
+  getPackSession,
+  scanPackItem,
+  flagPackItem,
+  weighPackSession,
+  completePackSession
+} from '../domain/packingBenchRepo.js';
 
 export function createPackingRouter(db: Database.Database): Router {
   const router = Router();
@@ -17,42 +23,91 @@ export function createPackingRouter(db: Database.Database): Router {
     }
   });
 
-  // POST /internal/v1/orders/:ref/pack
-  router.post('/internal/v1/orders/:ref/pack', (req: Request, res: Response, next: NextFunction) => {
+  // POST /internal/v1/packing/open
+  router.post('/internal/v1/packing/open', (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { ref } = req.params;
-      const key =
-        (req.headers['x-idempotency-key'] as string) ||
-        (req.headers['idempotency-key'] as string) ||
-        req.body?.idempotency_key;
+      const actor = req.body.actor || { id: 1, username: 'staff1', role: 'STAFF' };
+      const session = openPackSession(db, {
+        toteScan: req.body.toteScan,
+        benchCode: req.body.benchCode,
+        actor
+      });
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
 
-      if (!key) {
-        throw new DomainError('IDEMPOTENCY_KEY_REQUIRED', 'Idempotency-Key header is required');
-      }
+  // GET /internal/v1/packing/sessions/:id
+  router.get('/internal/v1/packing/sessions/:id', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const session = getPackSession(db, id);
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
 
-      const parsed = packOrderSchema.parse(req.body);
-      const actor = req.actor || req.body?.actor || { id: 1, role: 'STAFF' };
+  // POST /internal/v1/packing/sessions/:id/scan-item
+  router.post('/internal/v1/packing/sessions/:id/scan-item', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const actor = req.body.actor || { id: 1, username: 'staff1', role: 'STAFF' };
+      const session = scanPackItem(db, id, {
+        scan: req.body.scan,
+        actor
+      });
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
 
-      const result = runIdempotent(
-        db,
-        {
-          key,
-          scope: `order:pack:${ref}`,
-          body: parsed,
-          actor
-        },
-        (txDb) => {
-          const packResult = executePackOrder(txDb, {
-            order_ref: ref,
-            notes: parsed.notes,
-            accept_partial: parsed.accept_partial,
-            actor
-          });
-          return { status: 201, body: packResult };
-        }
-      );
+  // POST /internal/v1/packing/sessions/:id/flag-item
+  router.post('/internal/v1/packing/sessions/:id/flag-item', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const actor = req.body.actor || { id: 1, username: 'staff1', role: 'STAFF' };
+      const session = flagPackItem(db, id, {
+        sku: req.body.sku,
+        qty: req.body.qty,
+        kind: req.body.kind,
+        note: req.body.note,
+        actor
+      });
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
 
-      res.status(result.status).json(result.body);
+  // POST /internal/v1/packing/sessions/:id/weigh
+  router.post('/internal/v1/packing/sessions/:id/weigh', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const actor = req.body.actor || { id: 1, username: 'staff1', role: 'STAFF' };
+      const session = weighPackSession(db, id, {
+        grams: req.body.grams,
+        actor
+      });
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /internal/v1/packing/sessions/:id/complete
+  router.post('/internal/v1/packing/sessions/:id/complete', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = Number(req.params.id);
+      const actor = req.body.actor || { id: 1, username: 'staff1', role: 'STAFF' };
+      const result = completePackSession(db, id, {
+        slotScan: req.body.slotScan,
+        cartonType: req.body.cartonType,
+        actor
+      });
+      res.json(result);
     } catch (err) {
       next(err);
     }

@@ -19,6 +19,7 @@ import { ExceptionsPage } from './pages/ExceptionsPage.js';
 import { PackingPage } from './pages/PackingPage.js';
 import { AdminPage } from './pages/AdminPage.js';
 import { PickerFloorPage } from './pages/floor/PickerFloorPage.js';
+import { PackerFloorPage } from './pages/floor/PackerFloorPage.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,6 +55,7 @@ export const App: React.FC = () => {
             <Route path="/picking" element={<RequirePerm perm="pick:execute"><PickingPage /></RequirePerm>} />
             <Route path="/picking/:ref" element={<RequirePerm perm="pick:execute"><MissionDetailPage /></RequirePerm>} />
             <Route path="/floor/pick" element={<RequirePerm perm="pick:execute"><PickerFloorPage /></RequirePerm>} />
+            <Route path="/floor/pack" element={<RequirePerm perm="pack:execute"><PackerFloorPage /></RequirePerm>} />
             <Route path="/packing" element={<RequirePerm perm="pack:execute"><PackingPage /></RequirePerm>} />
             <Route path="/exceptions" element={<RequirePerm perm="exception:view"><ExceptionsPage /></RequirePerm>} />
             <Route path="/tasks" element={<RequirePerm perm="control:view"><TasksPage /></RequirePerm>} />

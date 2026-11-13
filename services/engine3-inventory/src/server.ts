@@ -29,6 +29,7 @@ import { createConfigRouter } from './routes/config.js';
 import { createAuditRouter } from './routes/audit.js';
 import { createLedgerRouter } from './routes/ledger.js';
 import { createFloorTasksRouter } from './routes/floorTasks.js';
+import { createDispatchRouter } from './routes/dispatch.js';
 import { startBackgroundJobs, stopBackgroundJobs } from './jobs/index.js';
 
 export function createApp(db: Database.Database): Express {
@@ -58,6 +59,7 @@ export function createApp(db: Database.Database): Express {
   app.use(createConfigRouter(db));
   app.use(createAuditRouter(db));
   app.use(createLedgerRouter(db));
+  app.use(createDispatchRouter(db));
 
   // Error handler
   app.use(errorHandler);

@@ -21,6 +21,7 @@ import { missionsRouter } from './routes/missions.js';
 import { pickStopsRouter } from './routes/picking.js';
 import { exceptionsRouter } from './routes/exceptions.js';
 import { packingRouter } from './routes/packing.js';
+import { dispatchRouter } from './routes/dispatch.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { usersRouter } from './routes/users.js';
 import { configRouter } from './routes/config.js';
@@ -62,6 +63,7 @@ export function createApp(): Express {
   app.use('/api/pick-stops', pickStopsRouter);
   app.use('/api/exceptions', exceptionsRouter);
   app.use('/api/packing', packingRouter);
+  app.use('/api/dispatch', dispatchRouter);
   app.use('/api', dashboardRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/config', configRouter);

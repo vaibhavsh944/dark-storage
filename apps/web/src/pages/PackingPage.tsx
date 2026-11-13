@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../api/client.js';
 import { useAuthStore } from '../stores/authStore.js';
@@ -37,6 +38,9 @@ export const PackingPage: React.FC = () => {
             Inspect picked units, handle shortfalls, and complete packing.
           </p>
         </div>
+        <Link to="/floor/pack" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          📱 Open Pack Floor PDA
+        </Link>
       </div>
 
       {/* Main Grid: Left Queue, Right Detail */}
