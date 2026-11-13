@@ -34,12 +34,12 @@
 - [x] P3-T6 Integration test tests/integration/auditChain.test.ts
 
 ## Phase 4: Append-only stock ledger (MUST)
-- [ ] P4-T1 Migration 013_products_ext.sql
-- [ ] P4-T2 Migration 014_ledger.sql
-- [ ] P4-T3 Implement postLedger.ts and backfillOpeningLedger.ts
-- [ ] P4-T4 Rewire Receive, Putaway, and Relocate to postLedger
-- [ ] P4-T5 Ledger query & reconciliation endpoints
-- [ ] P4-T6 Tests
+- [x] P4-T1 Migration 013_products_ext.sql
+- [x] P4-T2 Migration 014_ledger.sql
+- [x] P4-T3 Implement postLedger.ts and backfillOpeningLedger.ts
+- [x] P4-T4 Rewire Receive, Putaway, and Relocate to postLedger
+- [x] P4-T5 Ledger query & reconciliation endpoints
+- [x] P4-T6 Tests
 
 ## Phase 5: Totes, claim, leases, floor tasks, 3-step picking (MUST)
 - [ ] P5-T1 Migration 015_totes_missions.sql
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P4-T1
+next: P5-T1

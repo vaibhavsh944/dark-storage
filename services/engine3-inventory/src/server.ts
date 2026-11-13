@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { openDb } from './db/connection.js';
 import { purgeOldIdempotencyKeys } from './domain/idempotency.js';
 import { ensureAuditChain } from './audit/appendAudit.js';
+import { backfillOpeningLedger } from './ledger/backfillOpeningLedger.js';
 import { internalAuth } from './middleware/internalAuth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
@@ -26,6 +27,7 @@ import { createDashboardRouter } from './routes/dashboard.js';
 import { createOutboxRouter } from './routes/outbox.js';
 import { createConfigRouter } from './routes/config.js';
 import { createAuditRouter } from './routes/audit.js';
+import { createLedgerRouter } from './routes/ledger.js';
 
 export function createApp(db: Database.Database): Express {
   const app = express();
@@ -52,6 +54,7 @@ export function createApp(db: Database.Database): Express {
   app.use(createOutboxRouter(db));
   app.use(createConfigRouter(db));
   app.use(createAuditRouter(db));
+  app.use(createLedgerRouter(db));
 
   // Error handler
   app.use(errorHandler);
@@ -73,6 +76,12 @@ if (isMain) {
     ensureAuditChain(db);
   } catch (e) {
     console.warn('Could not ensure audit chain on startup:', e);
+  }
+
+  try {
+    backfillOpeningLedger(db);
+  } catch (e) {
+    console.warn('Could not backfill opening ledger on startup:', e);
   }
 
   try {

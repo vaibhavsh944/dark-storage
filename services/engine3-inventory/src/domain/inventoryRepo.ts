@@ -3,6 +3,7 @@ import { DomainError } from '@dark-storage/shared';
 import { nextRef } from './ids.js';
 import { recordAudit } from './audit.js';
 import { insertOutboxEvent } from './outbox.js';
+import { postLedger, reserveStock, releaseStock } from '../ledger/postLedger.js';
 
 export interface StockInArgs {
   bin: string;
@@ -127,28 +128,16 @@ export function stockIn(db: Database.Database, args: StockInArgs): void {
     });
   }
 
-  // 7. Conditional update
-  try {
-    const res = db.prepare(`
-      UPDATE inventory
-      SET sku = @sku, qty = qty + @q, updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-      WHERE bin_code = @bin
-        AND (sku IS NULL OR UPPER(sku) = UPPER(@sku))
-        AND qty + @q <= (SELECT capacity FROM bins WHERE code = @bin)
-    `).run({ sku, q: qty, bin: binCode });
-
-    if (res.changes !== 1) {
-      throw new DomainError('INVENTORY_DRIFT', 'Failed to update inventory');
-    }
-  } catch (err) {
-    if (err instanceof DomainError) throw err;
-    const msg = String(err);
-    if (msg.includes('CAPACITY_EXCEEDED')) throw new DomainError('CAPACITY_EXCEEDED', 'Bin capacity exceeded');
-    if (msg.includes('SKU_CONFLICT')) throw new DomainError('SKU_CONFLICT', 'Bin already holds a different SKU');
-    if (msg.includes('BIN_NOT_RECEIVABLE')) throw new DomainError('BIN_NOT_RECEIVABLE', 'Bin not receivable');
-    if (msg.includes('STORAGE_CLASS_MISMATCH')) throw new DomainError('STORAGE_CLASS_MISMATCH', 'Storage class mismatch');
-    throw err;
-  }
+  // 7. Post ledger to update inventory via projection
+  const lotId = `LOT-OPEN-${sku}`;
+  postLedger(db, [{
+    sku,
+    lotId,
+    qty,
+    from: 'EXT',
+    to: `BIN:${binCode}`,
+    type: 'PUTAWAY'
+  }], null);
 }
 
 export function stockOut(db: Database.Database, args: StockOutArgs): void {
@@ -163,10 +152,11 @@ export function stockOut(db: Database.Database, args: StockOutArgs): void {
     throw new DomainError('QUANTITY_INVALID', 'Quantity must be a positive integer');
   }
 
-  const invRow = db.prepare('SELECT sku, qty, reserved_qty FROM inventory WHERE bin_code = ?').get(binCode) as {
+  const invRow = db.prepare('SELECT sku, qty, reserved_qty, lot_id FROM inventory WHERE bin_code = ?').get(binCode) as {
     sku: string | null;
     qty: number;
     reserved_qty: number;
+    lot_id: string | null;
   } | undefined;
 
   if (!invRow || invRow.qty < qty) {
@@ -190,57 +180,27 @@ export function stockOut(db: Database.Database, args: StockOutArgs): void {
     }
   }
 
-  const res = db.prepare(`
-    UPDATE inventory
-    SET qty = qty - @q,
-        reserved_qty = reserved_qty - CASE WHEN @consume = 1 THEN @q ELSE 0 END,
-        sku = CASE WHEN qty - @q = 0 THEN NULL ELSE sku END,
-        updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-    WHERE bin_code = @bin AND qty >= @q
-      AND CASE WHEN @consume = 1 THEN reserved_qty >= @q ELSE (qty - reserved_qty) >= @q END
-  `).run({ q: qty, consume: consumeReserved ? 1 : 0, bin: binCode });
+  const lotId = invRow.lot_id || `LOT-OPEN-${invRow.sku}`;
+  postLedger(db, [{
+    sku: invRow.sku!,
+    lotId,
+    qty,
+    from: `BIN:${binCode}`,
+    to: 'EXT',
+    type: 'PICK'
+  }], null);
 
-  if (res.changes !== 1) {
-    throw new DomainError('INVENTORY_DRIFT', 'Failed to decrement stock');
+  if (consumeReserved) {
+    releaseStock(db, binCode, qty);
   }
 }
 
 export function reserve(db: Database.Database, args: ReserveArgs): void {
-  const { bin: binCode, qty } = args;
-
-  if (!Number.isInteger(qty) || qty <= 0) {
-    throw new DomainError('QUANTITY_INVALID', 'Quantity must be a positive integer');
-  }
-
-  const res = db.prepare(`
-    UPDATE inventory
-    SET reserved_qty = reserved_qty + @q,
-        updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-    WHERE bin_code = @bin AND (qty - reserved_qty) >= @q
-  `).run({ q: qty, bin: binCode });
-
-  if (res.changes === 0) {
-    throw new DomainError('INSUFFICIENT_STOCK', 'Not enough unreserved stock to reserve');
-  }
+  reserveStock(db, args.bin, args.qty);
 }
 
 export function release(db: Database.Database, args: ReleaseArgs): void {
-  const { bin: binCode, qty } = args;
-
-  if (!Number.isInteger(qty) || qty <= 0) {
-    throw new DomainError('QUANTITY_INVALID', 'Quantity must be a positive integer');
-  }
-
-  const res = db.prepare(`
-    UPDATE inventory
-    SET reserved_qty = reserved_qty - @q,
-        updated_at = (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-    WHERE bin_code = @bin AND reserved_qty >= @q
-  `).run({ q: qty, bin: binCode });
-
-  if (res.changes === 0) {
-    throw new DomainError('INVENTORY_DRIFT', 'Cannot release more than reserved quantity');
-  }
+  releaseStock(db, args.bin, args.qty);
 }
 
 export function recordMovement(db: Database.Database, args: RecordMovementArgs): string {

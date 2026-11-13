@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { DomainError } from '@dark-storage/shared';
 import { nextRef } from './ids.js';
 import { recordMovement } from './inventoryRepo.js';
+import { ensureLot, postLedger, LedgerLine } from '../ledger/postLedger.js';
 import { recordAudit } from './audit.js';
 import { insertOutboxEvent } from './outbox.js';
 
@@ -120,9 +121,30 @@ export function createReceipt(db: Database.Database, args: CreateReceiptArgs): R
   `);
 
   // 3. For each line
+  const ledgerLines: LedgerLine[] = [];
   let lineNo = 1;
   for (const line of lines) {
     const pInfo = productInfoMap.get(line.sku.toUpperCase())!;
+    const lotId = `LOT-${receiptRef}-${pInfo.sku}`;
+
+    ensureLot(db, {
+      lotId,
+      sku: pInfo.sku,
+      lotCode: receiptRef,
+      poRef: args.reference_no || null,
+      supplier: args.supplier || null
+    });
+
+    ledgerLines.push({
+      sku: pInfo.sku,
+      lotId,
+      qty: line.qty,
+      from: 'EXT',
+      to: `STAGED:${receiptRef}`,
+      type: 'RECEIVE',
+      refType: 'RECEIPT',
+      refId: receiptRef
+    });
 
     const movRef = recordMovement(db, {
       type: 'RECEIVE',
@@ -155,6 +177,11 @@ export function createReceipt(db: Database.Database, args: CreateReceiptArgs): R
 
     hooks?.afterStep?.('line:' + lineNo);
     lineNo++;
+  }
+
+  // Post to ledger
+  if (ledgerLines.length > 0) {
+    postLedger(db, ledgerLines, { id: actor.id });
   }
 
   // 4. Audit & Outbox

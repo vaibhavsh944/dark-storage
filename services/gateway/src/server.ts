@@ -24,6 +24,7 @@ import { packingRouter } from './routes/packing.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { usersRouter } from './routes/users.js';
 import { configRouter } from './routes/config.js';
+import { ledgerRouter } from './routes/ledger.js';
 
 export function createApp(): Express {
   const app = express();
@@ -62,6 +63,7 @@ export function createApp(): Express {
   app.use('/api', dashboardRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/config', configRouter);
+  app.use('/api/ledger', ledgerRouter);
 
 
   // Unknown route handler
