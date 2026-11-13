@@ -42,14 +42,14 @@
 - [x] P4-T6 Tests
 
 ## Phase 5: Totes, claim, leases, floor tasks, 3-step picking (MUST)
-- [ ] P5-T1 Migration 015_totes_missions.sql
-- [ ] P5-T2 Blind DTO mapper (floorDtos.ts) + Unit test
-- [ ] P5-T3 Self-claim mission endpoint (POST /api/missions/claim-next)
-- [ ] P5-T4 Heartbeat, release, force-unassign, and Lease Sweep Job
-- [ ] P5-T5 Picker active mission & 3-Step Barcode Scan endpoints
-- [ ] P5-T6 Generic Floor Tasks endpoints
-- [ ] P5-T7 Web Picker Floor Screen (/floor/pick)
-- [ ] P5-T8 Tests
+- [x] P5-T1 Migration 015_totes_missions.sql
+- [x] P5-T2 Blind DTO mapper (floorDtos.ts) + Unit test
+- [x] P5-T3 Self-claim mission endpoint (POST /api/missions/claim-next)
+- [x] P5-T4 Heartbeat, release, force-unassign, and Lease Sweep Job
+- [x] P5-T5 Picker active mission & 3-Step Barcode Scan endpoints
+- [x] P5-T6 Generic Floor Tasks endpoints
+- [x] P5-T7 Web Picker Floor Screen (/floor/pick)
+- [x] P5-T8 Tests
 
 ## Phase 6: Packing bench and Staff dispatch handover (MUST)
 - [ ] P6-T1 Migration 016_orders_rebuild.sql
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P5-T1
+next: P6-T1

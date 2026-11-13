@@ -9,6 +9,7 @@ import {
   getRerouteInput,
   rerouteMission
 } from '../domain/pickingRepo.js';
+import { scanBin, scanItem, scanTote } from '../domain/scanPickRepo.js';
 
 export function createPickingRouter(db: Database.Database): Router {
   const router = Router();
@@ -40,6 +41,42 @@ export function createPickingRouter(db: Database.Database): Router {
       }
 
       res.json(stop);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /internal/v1/pick-stops/:ref/scan-bin
+  router.post('/internal/v1/pick-stops/:ref/scan-bin', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = req.actor || req.body?.actor || { id: 1, role: 'PICKER' };
+      const { scan } = req.body || {};
+      const result = scanBin(db, req.params.ref, scan, actor);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /internal/v1/pick-stops/:ref/scan-item
+  router.post('/internal/v1/pick-stops/:ref/scan-item', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = req.actor || req.body?.actor || { id: 1, role: 'PICKER' };
+      const { scan, qty } = req.body || {};
+      const result = scanItem(db, req.params.ref, scan, qty, actor);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // POST /internal/v1/pick-stops/:ref/scan-tote
+  router.post('/internal/v1/pick-stops/:ref/scan-tote', (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const actor = req.actor || req.body?.actor || { id: 1, role: 'PICKER' };
+      const { scan } = req.body || {};
+      const result = scanTote(db, req.params.ref, scan, actor);
+      res.json(result);
     } catch (err) {
       next(err);
     }

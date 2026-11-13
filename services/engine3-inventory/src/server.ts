@@ -28,6 +28,8 @@ import { createOutboxRouter } from './routes/outbox.js';
 import { createConfigRouter } from './routes/config.js';
 import { createAuditRouter } from './routes/audit.js';
 import { createLedgerRouter } from './routes/ledger.js';
+import { createFloorTasksRouter } from './routes/floorTasks.js';
+import { startBackgroundJobs, stopBackgroundJobs } from './jobs/index.js';
 
 export function createApp(db: Database.Database): Express {
   const app = express();
@@ -49,6 +51,7 @@ export function createApp(db: Database.Database): Express {
   app.use(createOrdersRouter(db));
   app.use(createMissionsRouter(db));
   app.use(createPickingRouter(db));
+  app.use(createFloorTasksRouter(db));
   app.use(createPackingRouter(db));
   app.use(createDashboardRouter(db));
   app.use(createOutboxRouter(db));
@@ -94,11 +97,13 @@ if (isMain) {
   }
 
   const app = createApp(db);
+  startBackgroundJobs(db);
   const server = app.listen(config.PORT, config.HOST, () => {
     console.log(`Engine 3 (Inventory) listening on http://${config.HOST}:${config.PORT}`);
   });
 
   const cleanup = () => {
+    stopBackgroundJobs();
     server.close(() => {
       db.close();
       process.exit(0);

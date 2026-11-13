@@ -68,7 +68,8 @@ export class AppError extends Error {
       extraDetails = messageOrDetails;
     }
 
-    super(message);
+    const fullMessage = message.startsWith(code) ? message : `${code}: ${message}`;
+    super(fullMessage);
     this.name = 'AppError';
     this.code = code;
     this.httpStatus = httpStatus;

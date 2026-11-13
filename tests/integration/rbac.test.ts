@@ -41,6 +41,46 @@ describe('P2-T6: RBAC Enforcement and Endpoint Removals', () => {
       expect(res.status).toBe(403);
       expect(res.body.code).toBe('FORBIDDEN');
     });
+
+    it('MANAGER gets 403 FORBIDDEN on POST /api/missions/claim-next', async () => {
+      const res = await request(app)
+        .post('/api/missions/claim-next')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({});
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FORBIDDEN');
+    });
+
+    it('MANAGER gets 403 FORBIDDEN on POST /api/pick-stops/1/scan-bin', async () => {
+      const res = await request(app)
+        .post('/api/pick-stops/1/scan-bin')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ scan: 'A-01-01' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FORBIDDEN');
+    });
+
+    it('MANAGER gets 403 FORBIDDEN on POST /api/pick-stops/1/scan-item', async () => {
+      const res = await request(app)
+        .post('/api/pick-stops/1/scan-item')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ scan: 'SKU-001', qty: 1 });
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FORBIDDEN');
+    });
+
+    it('MANAGER gets 403 FORBIDDEN on POST /api/pick-stops/1/scan-tote', async () => {
+      const res = await request(app)
+        .post('/api/pick-stops/1/scan-tote')
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ scan: 'TOTE-001' });
+
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('FORBIDDEN');
+    });
   });
 
   describe('Picker Forbidden Actions (Order/Inventory/Audit Visibility)', () => {

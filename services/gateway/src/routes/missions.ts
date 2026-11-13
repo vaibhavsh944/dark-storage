@@ -8,6 +8,96 @@ export const missionsRouter = Router();
 
 missionsRouter.use(authMiddleware);
 
+// POST /api/missions/claim-next (mission:claim - PICKER only)
+missionsRouter.post('/claim-next', requirePerm('mission:claim'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const actor = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user!.role,
+      permissions: req.user!.permissions
+    };
+
+    const result = await callEngine3({
+      method: 'POST',
+      path: '/internal/v1/missions/claim-next',
+      requestId: req.requestId,
+      actor
+    });
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/missions/:ref/heartbeat (pick:execute)
+missionsRouter.post('/:ref/heartbeat', requirePerm('pick:execute'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const actor = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user!.role
+    };
+
+    const result = await callEngine3({
+      method: 'POST',
+      path: `/internal/v1/missions/${req.params.ref}/heartbeat`,
+      requestId: req.requestId,
+      actor
+    });
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/missions/:ref/release (mission:claim)
+missionsRouter.post('/:ref/release', requirePerm('mission:claim'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const actor = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user!.role
+    };
+
+    const result = await callEngine3({
+      method: 'POST',
+      path: `/internal/v1/missions/${req.params.ref}/release`,
+      requestId: req.requestId,
+      actor
+    });
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/missions/:ref/force-unassign (mission:reassign - MANAGER only)
+missionsRouter.post('/:ref/force-unassign', requirePerm('mission:reassign'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const actor = {
+      id: req.user!.id,
+      name: req.user!.name,
+      role: req.user!.role
+    };
+
+    const result = await callEngine3({
+      method: 'POST',
+      path: `/internal/v1/missions/${req.params.ref}/force-unassign`,
+      requestId: req.requestId,
+      actor,
+      body: req.body
+    });
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/missions/:ref/start (pick:execute - PICKER only)
 missionsRouter.post('/:ref/start', requirePerm('pick:execute'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -41,8 +131,9 @@ missionsRouter.get('/', requirePerm(['order:view', 'pick:execute']), async (req:
   try {
     const queryParams = new URLSearchParams(req.query as Record<string, string>);
 
-    // PICKER role is restricted to own missions
-    if (req.user!.role === 'PICKER') {
+    // If caller has pick:execute and lacks order:view, restrict to own missions
+    const perms = req.user?.permissions || [];
+    if (perms.includes('pick:execute') && !perms.includes('order:view')) {
       queryParams.set('picker_id', String(req.user!.id));
     }
 
@@ -67,8 +158,8 @@ missionsRouter.get('/:ref', requirePerm(['order:view', 'pick:execute']), async (
       requestId: req.requestId
     });
 
-    // If PICKER, enforce access only to own mission
-    if (req.user!.role === 'PICKER' && result.data?.picker?.id !== req.user!.id) {
+    const perms = req.user?.permissions || [];
+    if (perms.includes('pick:execute') && !perms.includes('order:view') && result.data?.picker?.id !== req.user!.id) {
       throw new DomainError('NOT_YOUR_MISSION', 'You do not have access to this mission');
     }
 
