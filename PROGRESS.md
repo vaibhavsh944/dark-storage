@@ -52,7 +52,7 @@
 - [x] P5-T8 Tests
 
 ## Phase 6: Packing bench and Staff dispatch handover (MUST)
-- [ ] P6-T1 Migration 016_orders_rebuild.sql
+- [x] P6-T1 Migration 016_orders_rebuild.sql
 - [ ] P6-T2 Migration 017_packing_dispatch.sql
 - [ ] P6-T3 Open Pack Session (POST /api/packing/open)
 - [ ] P6-T4 Item-by-Item Scan & Flagging at Pack Bench

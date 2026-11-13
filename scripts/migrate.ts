@@ -40,6 +40,7 @@ export function applyMigrations(db: Database.Database, dir: string): { applied: 
       continue;
     }
 
+    db.pragma('foreign_keys = OFF');
     const tx = db.transaction(() => {
       db.exec(content);
       db.prepare(`
@@ -49,6 +50,11 @@ export function applyMigrations(db: Database.Database, dir: string): { applied: 
     });
 
     tx();
+    db.pragma('foreign_keys = ON');
+    const fkErrors = db.pragma('foreign_key_check') as any[];
+    if (fkErrors.length > 0) {
+      throw new Error(`FOREIGN_KEY_CHECK_FAILED: Migration ${file} left invalid foreign keys: ${JSON.stringify(fkErrors)}`);
+    }
     applied++;
   }
 
