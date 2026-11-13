@@ -8,12 +8,16 @@ import { LabelPrintModal } from '../components/LabelPrintModal.js';
 
 interface AuditItem {
   id: number;
+  seq?: number;
   at: string;
   actor: string;
   role: string;
   action: string;
   entity_type: string;
   entity_id: string;
+  prev_hash?: string;
+  row_hash?: string;
+  reason_code?: string;
   details: any;
 }
 
@@ -52,6 +56,36 @@ export const AdminPage: React.FC = () => {
   }>({});
 
   const canAuditView = useCan('audit:view');
+  const canAuditVerify = useCan('audit:verify');
+  const canAuditExport = useCan('audit:export');
+
+  // Audit chain verification state
+  const [verifyResult, setVerifyResult] = useState<{
+    ok: boolean;
+    checked: number;
+    brokenAtSeq: number | null;
+    headHash?: string;
+  } | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const handleVerifyChain = async () => {
+    setIsVerifying(true);
+    setVerifyError(null);
+    setVerifyResult(null);
+    try {
+      const res = await apiFetch<any>('/api/audit/verify');
+      setVerifyResult(res);
+    } catch (err: any) {
+      setVerifyError(err.message || 'Verification request failed');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleExportCsv = () => {
+    window.open('/api/audit/export', '_blank');
+  };
 
   const {
     data: auditData,
@@ -109,12 +143,12 @@ export const AdminPage: React.FC = () => {
     setAppliedFilters({});
   };
 
-  if (user?.role !== 'MANAGER') {
+  if (!canAuditView) {
     return (
       <div className="card" style={{ maxWidth: 480, margin: '40px auto', textAlign: 'center', padding: '32px 24px' }}>
         <h2 style={{ color: 'var(--accent-danger)', marginBottom: 8, fontSize: 18 }}>Access Denied</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          System administration features require the <strong>MANAGER</strong> role. You are currently logged in as a <em>{user?.role || 'Guest'}</em>.
+          You do not have permission to view system administration and audit logs.
         </p>
       </div>
     );
@@ -193,6 +227,78 @@ export const AdminPage: React.FC = () => {
 
       {activeTab === 'audit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Actions & Verification Toolbar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {canAuditVerify && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleVerifyChain}
+                  disabled={isVerifying}
+                  data-testid="audit-verify-chain"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {isVerifying ? 'Verifying Chain...' : '🛡️ Verify Hash Chain Integrity'}
+                </button>
+              )}
+              {canAuditExport && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleExportCsv}
+                  data-testid="audit-export-csv"
+                  style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  📥 Export CSV
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Verification Status Banner */}
+          {verifyResult && verifyResult.ok && (
+            <div
+              className="alert alert-success"
+              data-testid="audit-verify-success"
+              style={{
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgba(46, 125, 50, 0.12)',
+                border: '1px solid #2e7d32',
+                color: '#2e7d32',
+                fontWeight: 600,
+                fontSize: 14
+              }}
+            >
+              Cryptographic Chain Intact: {verifyResult.checked} records verified, head SHA-256: {verifyResult.headHash || '...'}
+            </div>
+          )}
+
+          {verifyResult && !verifyResult.ok && (
+            <div
+              className="alert alert-danger"
+              data-testid="audit-verify-tamper"
+              style={{
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: 'rgba(211, 47, 47, 0.12)',
+                border: '1px solid #d32f2f',
+                color: '#d32f2f',
+                fontWeight: 700,
+                fontSize: 14
+              }}
+            >
+              TAMPER DETECTED at seq #{verifyResult.brokenAtSeq}
+            </div>
+          )}
+
+          {verifyError && (
+            <div style={{ color: 'var(--accent-danger)', fontSize: 13, padding: '8px 12px' }}>
+              {verifyError}
+            </div>
+          )}
+
           {/* Filters Form */}
           <form
             onSubmit={handleApplyFilters}
@@ -276,18 +382,23 @@ export const AdminPage: React.FC = () => {
                 <table className="table" data-testid="audit-table">
                   <thead>
                     <tr>
+                      <th style={{ width: 60 }}>Seq</th>
                       <th>Timestamp</th>
                       <th>Actor</th>
                       <th>Role</th>
                       <th>Action</th>
                       <th>Entity Type</th>
                       <th>Entity ID</th>
+                      <th>Hash</th>
                       <th>Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {auditData.items.map((item) => (
                       <tr key={item.id}>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 13 }}>
+                          #{item.seq ?? item.id}
+                        </td>
                         <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: 13 }}>
                           {new Date(item.at).toLocaleString()}
                         </td>
@@ -301,6 +412,15 @@ export const AdminPage: React.FC = () => {
                         <td>{item.entity_type}</td>
                         <td>
                           <span style={{ fontFamily: 'var(--font-mono)' }}>{item.entity_id}</span>
+                        </td>
+                        <td>
+                          <span
+                            className="badge badge-secondary"
+                            style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}
+                            title={item.row_hash || 'None'}
+                          >
+                            {item.row_hash ? `${item.row_hash.slice(0, 8)}...` : '-'}
+                          </span>
                         </td>
                         <td style={{ maxWidth: 300 }}>
                           <pre

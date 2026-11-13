@@ -52,6 +52,24 @@ export const OrderDetailPage: React.FC = () => {
   });
   const mission = missionsData?.missions?.find((m: any) => m.order_ref === ref);
 
+  // Fetch chronological order events (P3-T5)
+  const { data: orderEventsData } = useQuery<{
+    events: Array<{
+      id: number;
+      order_ref: string;
+      event: string;
+      actor_id?: string;
+      actor_role?: string;
+      payload?: any;
+      at: string;
+    }>;
+  }>({
+    queryKey: ['order-events', ref],
+    queryFn: () => apiFetch(`/api/orders/${ref}/events`),
+    enabled: !!ref
+  });
+  const orderEvents = orderEventsData?.events || [];
+
   // Assign mutation
   const assignMutation = useMutation({
     mutationFn: async (pickerId: number) => {
@@ -366,6 +384,49 @@ export const OrderDetailPage: React.FC = () => {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* Order Event Timeline */}
+      <div className="card" data-testid="order-events-card">
+        <h3 style={{ margin: '0 0 16px', fontSize: '1.1rem', fontWeight: 700 }}>Order Event History</h3>
+        {orderEvents.length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No lifecycle events recorded yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {orderEvents.map((e) => (
+              <div
+                key={e.id}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  fontSize: '13px'
+                }}
+              >
+                <div>
+                  <span className="badge badge-primary" style={{ marginRight: '10px', fontFamily: 'var(--font-mono)' }}>
+                    {e.event}
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)' }}>
+                    actor: {e.actor_id || 'System'} {e.actor_role ? `(${e.actor_role})` : ''}
+                  </span>
+                  {e.payload && Object.keys(e.payload).length > 0 && (
+                    <span style={{ marginLeft: '12px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                      {JSON.stringify(e.payload)}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {new Date(e.at).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Audit Timeline */}

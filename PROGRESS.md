@@ -26,12 +26,12 @@
 - [x] P2-T6 Integration test tests/integration/rbac.test.ts
 
 ## Phase 3: Hash-chained audit log and order events (MUST)
-- [ ] P3-T1 Migration 012_audit_chain.sql
-- [ ] P3-T2 Implement appendAudit and appendOrderEvent
-- [ ] P3-T3 Replace raw INSERT INTO audit_log writes
-- [ ] P3-T4 Audit verification, export, and order timeline endpoints
-- [ ] P3-T5 Web Audit Verification UI
-- [ ] P3-T6 Integration test tests/integration/auditChain.test.ts
+- [x] P3-T1 Migration 012_audit_chain.sql
+- [x] P3-T2 Implement appendAudit and appendOrderEvent
+- [x] P3-T3 Replace raw INSERT INTO audit_log writes
+- [x] P3-T4 Audit verification, export, and order timeline endpoints
+- [x] P3-T5 Web Audit Verification UI
+- [x] P3-T6 Integration test tests/integration/auditChain.test.ts
 
 ## Phase 4: Append-only stock ledger (MUST)
 - [ ] P4-T1 Migration 013_products_ext.sql
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P3-T1
+next: P4-T1

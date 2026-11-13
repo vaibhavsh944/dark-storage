@@ -10,7 +10,7 @@ import {
 } from '@dark-storage/shared';
 import { nextRef } from './ids.js';
 import { reserve, release } from './inventoryRepo.js';
-import { audit } from './audit.js';
+import { audit, appendOrderEvent } from './audit.js';
 import { emit } from './outbox.js';
 
 export function closeReservationIfDone(db: Database.Database, reservationId: number): void {
@@ -226,6 +226,17 @@ export function executeReserveOrder(
     }
   });
 
+  appendOrderEvent(db, {
+    orderRef,
+    event: 'order.created',
+    actorId: params.actor.id,
+    actorRole: params.actor.role,
+    payload: {
+      lines: sortedLines,
+      allocations
+    }
+  });
+
   emit(db, {
     event_type: 'order.created',
     entity_type: 'ORDER',
@@ -360,6 +371,18 @@ export function cancelOrder(
     entity_type: 'ORDER',
     entity_id: ref,
     details: {
+      reason,
+      released: releasedList,
+      unreturned_picked: unreturnedList
+    }
+  });
+
+  appendOrderEvent(db, {
+    orderRef: ref,
+    event: 'order.cancelled',
+    actorId: actor.id,
+    actorRole: actor.role,
+    payload: {
       reason,
       released: releasedList,
       unreturned_picked: unreturnedList

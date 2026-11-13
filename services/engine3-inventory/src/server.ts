@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { openDb } from './db/connection.js';
 import { purgeOldIdempotencyKeys } from './domain/idempotency.js';
+import { ensureAuditChain } from './audit/appendAudit.js';
 import { internalAuth } from './middleware/internalAuth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
@@ -24,6 +25,7 @@ import { createPackingRouter } from './routes/packing.js';
 import { createDashboardRouter } from './routes/dashboard.js';
 import { createOutboxRouter } from './routes/outbox.js';
 import { createConfigRouter } from './routes/config.js';
+import { createAuditRouter } from './routes/audit.js';
 
 export function createApp(db: Database.Database): Express {
   const app = express();
@@ -49,6 +51,7 @@ export function createApp(db: Database.Database): Express {
   app.use(createDashboardRouter(db));
   app.use(createOutboxRouter(db));
   app.use(createConfigRouter(db));
+  app.use(createAuditRouter(db));
 
   // Error handler
   app.use(errorHandler);
@@ -65,6 +68,12 @@ const isMain = process.argv[1] && (
 if (isMain) {
   fs.mkdirSync(path.dirname(config.WAREHOUSE_DB_PATH), { recursive: true });
   const db = openDb(config.WAREHOUSE_DB_PATH);
+
+  try {
+    ensureAuditChain(db);
+  } catch (e) {
+    console.warn('Could not ensure audit chain on startup:', e);
+  }
 
   try {
     const purged = purgeOldIdempotencyKeys(db);

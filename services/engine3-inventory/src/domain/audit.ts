@@ -1,34 +1,28 @@
 import Database from 'better-sqlite3';
+import { appendAudit, AppendAuditInput, appendOrderEvent, ensureAuditChain, verifyAuditChain } from '../audit/appendAudit.js';
+
+export { appendAudit, appendOrderEvent, ensureAuditChain, verifyAuditChain };
+export type { AppendAuditInput };
 
 export interface AuditParams {
-  actor: { id: number; role: string } | null;
+  actor: { id: number | string; role?: string; username?: string } | null;
   action: string;
   entity_type: string;
   entity_id: string;
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown> | string;
   request_id?: string;
 }
 
 export function audit(db: Database.Database, params: AuditParams): void {
-  db.prepare(`
-    INSERT INTO audit_log (
-      actor_user_id,
-      actor_role,
-      action,
-      entity_type,
-      entity_id,
-      details_json,
-      request_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    params.actor?.id ?? null,
-    params.actor?.role ?? null,
-    params.action,
-    params.entity_type,
-    params.entity_id,
-    JSON.stringify(params.details ?? {}),
-    params.request_id ?? null
-  );
+  appendAudit(db, {
+    actorId: params.actor?.id ?? null,
+    actorRole: params.actor?.role ?? null,
+    action: params.action,
+    entityType: params.entity_type,
+    entityId: params.entity_id,
+    details: params.details,
+    requestId: params.request_id
+  });
 }
 
 export function recordAudit(
@@ -39,27 +33,19 @@ export function recordAudit(
     action: string;
     before?: unknown;
     after?: unknown;
-    actor_id?: number | null;
+    actor_id?: number | string | null;
+    actor_role?: string | null;
     request_id?: string;
   }
 ): void {
-  db.prepare(`
-    INSERT INTO audit_log (
-      actor_user_id,
-      actor_role,
-      action,
-      entity_type,
-      entity_id,
-      details_json,
-      request_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    opts.actor_id ?? null,
-    null,
-    opts.action,
-    opts.entity_type,
-    opts.entity_id,
-    JSON.stringify({ before: opts.before, after: opts.after }),
-    opts.request_id ?? null
-  );
+  appendAudit(db, {
+    actorId: opts.actor_id ?? null,
+    actorRole: opts.actor_role ?? null,
+    action: opts.action,
+    entityType: opts.entity_type,
+    entityId: opts.entity_id,
+    before: opts.before,
+    after: opts.after,
+    requestId: opts.request_id
+  });
 }

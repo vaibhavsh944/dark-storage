@@ -126,6 +126,21 @@ ordersRouter.get('/', requirePerm('order:view'), async (req: Request, res: Respo
   }
 });
 
+// GET /api/orders/:ref/events (order:view)
+ordersRouter.get('/:ref/events', requirePerm('order:view'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await callEngine3({
+      method: 'GET',
+      path: `/internal/v1/orders/${req.params.ref}/events`,
+      requestId: req.requestId
+    });
+
+    res.status(result.status).json(result.data);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/orders/:ref (order:view)
 ordersRouter.get('/:ref', requirePerm('order:view'), async (req: Request, res: Response, next: NextFunction) => {
   try {
