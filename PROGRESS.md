@@ -62,7 +62,7 @@
 - [x] P6-T8 Integration test tests/integration/packFlow.test.ts
 
 ## Phase 7: Exception loop, blind counts, dual-control adjustments, quarantine, relocation (MUST)
-- [ ] P7-T1 Migration 018_exceptions_adjustments.sql
+- [x] P7-T1 Migration 018_exceptions_adjustments.sql
 - [ ] P7-T2 Picker raises exception with instant bin freeze & automatic live re-routing (Flow B)
 - [ ] P7-T3 Blind Cycle Count execution (POST /api/floor-tasks/:ref/count)
 - [ ] P7-T4 Four-Eyes Dual-Control Adjustments API (MANAGER 1 & MANAGER 2)
@@ -124,4 +124,4 @@
 - [ ] P14-T4 Documentation (DEMO_SCRIPT.md)
 
 ---
-next: P6-T1
+next: P7-T2
